@@ -320,10 +320,89 @@ if (!window.vkBridge) {
       f_watermelon: 'Арбуз', f_orange: 'Апельсин', f_lemon: 'Лимон', f_apple: 'Яблоко',
       f_grape: 'Виноград', f_kiwi: 'Киви', f_peach: 'Персик', f_mango: 'Манго',
       f_blueberry: 'Черника', f_strawberry: 'Клубника',
-      f_bomb: 'Бомба', f_gold: 'Золотой фрукт', f_freeze: 'Заморозка', f_double: 'Двойные очки'
+      f_bomb: 'Бомба', f_gold: 'Золотой фрукт', f_freeze: 'Заморозка', f_double: 'Двойные очки',
+      /* ===== v6.3.0: НОВЫЕ ключи монетизации/возврата (A1–E2).
+         Существующие ключи и ассеты не изменены. ===== */
+      double_coins: '×2 ОЧКИ И МОНЕТЫ',            /* A1: подпись кнопки удвоения */
+      trial_ad: 'Пробный раунд',                   /* A2: кнопка на карточке лезвия */
+      zen_ext: '+30 СЕКУНД',                       /* A3: продление дзена за рекламу */
+      streak_title: 'Серия входов',                /* B1: полоса стрик-чипов */
+      streak_day: 'День {n}',                      /* B1: тост получения дейлика */
+      hook_next: 'До награды: {a} {b}',            /* B2: крючок возврата */
+      hn_slice: 'срезов',
+      hn_combos: 'комбо',
+      hn_score: 'очков за раунд',
+      hn_gold: 'золотых фруктов',
+      hn_perfect: 'раундов без промахов',
+      hn_arcade: 'раундов в Аркаде',
+      hn_round_score: 'очков за раунд',
+      hn_total_fruits: 'фруктов',
+      hn_max_combo: 'комбо',
+      hn_modes_played: 'режимов',
+      hn_blades_owned: 'лезвий',
+      hn_streak: 'дней подряд',
+      hn_perfect_round: 'идеальных раундов',
+      hn_all_gold_round: 'золотых раундов',
+      hn_round_fruits: 'фруктов за раунд',
+      hn_zen_score: 'очков в Дзене',
+      duel_daily: 'Вызвать друга',                 /* B3: дуэль дня */
+      share_rec_toast: 'Поделись рекордом с друзьями!',  /* C1 */
+      rank_top10: 'Ты в топ-10 недели!',           /* C2 */
+      fx_auto: 'Эффекты снижены автоматически для плавности',  /* D2 */
+      continue_coins_n: 'Продолжить за {n}',       /* E2: цена с эскалацией */
+      set_theme: 'Тема фона',                      /* E1 */
+      th_default: 'Классика',
+      th_sunset: 'Закат',
+      th_ocean: 'Океан',
+      th_forest: 'Лес',
+      th_sakura: 'Сакура',
+      theme_buy_q: 'Купить тему «{name}» за {cost} монет?',
+      theme_bought: 'Тема «{name}» куплена!',
+      theme_on: 'Тема: {name}'
       /* Названия сторонних площадок из сборки удалены (п. 4.2.6 Правил VK):
          в интерфейсе игры не должно быть упоминаний платформ, отличных от VK. */
     },
+    /* v6.3: английская локализация ТОЛЬКО для новых ключей (требование ТЗ:
+       «все новые i18n-ключи в ru И en»). Язык интерфейса игры остаётся
+       русским: SUPPORTED = ['ru'], normalize() → 'ru' — не изменено. */
+    en: {
+      double_coins: '×2 SCORE & COINS',
+      trial_ad: 'Trial round',
+      zen_ext: '+30 SECONDS',
+      streak_title: 'Login streak',
+      streak_day: 'Day {n}',
+      hook_next: '{b} to reward: {a}',
+      hn_slice: 'slices',
+      hn_combos: 'combos',
+      hn_score: 'round points',
+      hn_gold: 'gold fruits',
+      hn_perfect: 'perfect rounds',
+      hn_arcade: 'arcade rounds',
+      hn_round_score: 'round points',
+      hn_total_fruits: 'fruits',
+      hn_max_combo: 'combos',
+      hn_modes_played: 'modes',
+      hn_blades_owned: 'blades',
+      hn_streak: 'streak days',
+      hn_perfect_round: 'perfect rounds',
+      hn_all_gold_round: 'gold rounds',
+      hn_round_fruits: 'fruits per round',
+      hn_zen_score: 'zen points',
+      duel_daily: 'Challenge a friend',
+      share_rec_toast: 'Share your record with friends!',
+      rank_top10: 'You made the weekly top 10!',
+      fx_auto: 'Effects auto-lowered for smoothness',
+      continue_coins_n: 'Continue for {n}',
+      set_theme: 'Background theme',
+      th_default: 'Classic',
+      th_sunset: 'Sunset',
+      th_ocean: 'Ocean',
+      th_forest: 'Forest',
+      th_sakura: 'Sakura',
+      theme_buy_q: 'Buy theme "{name}" for {cost} coins?',
+      theme_bought: 'Theme "{name}" purchased!',
+      theme_on: 'Theme: {name}'
+    }
 };
 
   var ACH = [
@@ -1288,7 +1367,7 @@ if (!window.vkBridge) {
   /* ===================== ЧАСТЬ A: КОНФИГ, УТИЛИТЫ, АССЕТЫ, ЗВУК ======== */
 
   var CFG = {
-    version: '6.2.4',
+    version: '6.3.0',
     saveKey: 'fs_save_v1',
     schema: 3,
     /* Зазор между липким баннером и элементами интерфейса, px (п. 5.1.4.2г) */
@@ -1318,6 +1397,7 @@ if (!window.vkBridge) {
     classicLives: 3,
     arcadeTime: 60,
     zenTime: 90,
+    zenExtTime: 30,           /* A3 v6.3: rewarded-продление дзена, один раз за раунд */
     firstSpawnDelay: 0.35,
     gentleTime: 8,
     freezeTime: 3,
@@ -1337,15 +1417,21 @@ if (!window.vkBridge) {
 
     coinPer100: 10,
     continueCost: 500,
+    continueCostMult: 1.6,    /* E2 v6.3: 2-й continue дороже (защита экономики) */
     dailyBonus: 30,
+    /* B1 v6.3: награда дейлика растёт со стриком входов: день 1..6 = ступени,
+       день 7+ = 100. День 1 = 30 — как прежний dailyBonus (экономика не сломана) */
+    streakTiers: [30, 40, 50, 60, 70, 80, 100],
     combo5Coins: 20,
     combo5CoinsCapPerRound: 10,
     migrationBonus: 1000,
 
+    /* ПОРОГИ ИНТЕРСТИШЛОВ НЕ ИЗМЕНЕНЫ (запрет ТЗ) */
     interstitialCooldown: 180,
     interstitialGrace: 60,
     interstitialMinPlay: 120,
     maxInterstitialPerSession: 6,
+    rewardedShield: 60,       /* A4 v6.3: не показывать interstitial < 60с после rewarded */
 
     physBudgetMs: 5
   };
@@ -1898,7 +1984,9 @@ if (!window.vkBridge) {
       replay: null,
       tutorial_done: false,
       premium_until: 0,
-      blade_trial: null
+      blade_trial: null,
+      /* E1 v6.3: косметические темы фона (покупка за монеты, коллекция) */
+      themes: { owned: ['default'], equipped: 'default' }
     };
   }
 
@@ -2087,7 +2175,8 @@ if (!window.vkBridge) {
       Store.save();
       return true;
     },
-    current: function () { return Blades.byId(Store.data.blade_equipped); },
+    /* A2 v6.3: пробное лезвие (за рекламу, 1 раунд) приоритетнее надетого */
+    current: function () { return Blades.byId(Store.data.blade_trial || Store.data.blade_equipped); },
     trial: function (id) { Store.data.blade_trial = id; Store.save(); },
     clearTrial: function () { if (Store.data.blade_trial) { Store.data.blade_trial = null; Store.save(); } },
     premiumDay: function () {
@@ -2159,14 +2248,24 @@ if (!window.vkBridge) {
       return { streak: d.streak, canClaim: true };
     },
     canClaim: function () { return Store.data.daily.claimed !== Daily.today(); },
+    /* B1 v6.3: ступени награды за серию входов: [30,40,50,60,70,80,100], 7+ = 100.
+       Логика стрика — существующая (daily.streak: вчера +1, пропуск → сброс,
+       сегодня → без изменений, см. Daily.refresh) */
+    streakBonus: function (n) {
+      var T = CFG.streakTiers || [];
+      n = Math.max(1, n | 0);
+      return T.length ? T[Math.min(n, T.length) - 1] : CFG.dailyBonus;
+    },
     claim: function () {
       if (!Daily.canClaim()) return 0;
       Daily.refresh();
       Store.data.daily.claimed = Daily.today();
-      Store.addCoins(CFG.dailyBonus);
+      /* B1 v6.3: награда зависит от стрика (день 1 = 30 — как раньше) */
+      var bonus = Daily.streakBonus(Store.data.daily.streak);
+      Store.addCoins(bonus);
       Achievements.check({});
       Store.flush();
-      return CFG.dailyBonus;
+      return bonus;
     },
     _setDate: function (key) {
       Store.data.daily.last_date = key;
@@ -2344,9 +2443,21 @@ if (!window.vkBridge) {
     tint: function () { var ev = Events.current(); return ev ? ev.tint : '#8a6bff'; }
   };
 
+  /* ------------- E1 v6.3: КОСМЕТИЧЕСКИЕ ТЕМЫ ФОНА (sink монет) ----------
+     Покупка за монеты, tint-оверлей поверх bg_menu/bg_game/bg_shop рядом с
+     modeTint-логикой (см. Game.drawBackground). Ассеты не добавляются. */
+  var THEMES = [
+    { id: 'default', cost: 0,   tint: null },
+    { id: 'sunset',  cost: 400, tint: '#ff8a5c' },
+    { id: 'ocean',   cost: 400, tint: '#37f6ff' },
+    { id: 'forest',  cost: 500, tint: '#5cff9d' },
+    { id: 'sakura',  cost: 600, tint: '#ffb7d5' }
+  ];
+
   FS.Store = Store;
   FS.Blades = Blades;
   FS.Events = Events;
+  FS.THEMES = THEMES;
   FS.Levels = Levels;
   FS.Achievements = Achievements;
   FS.Daily = Daily;
@@ -2425,6 +2536,7 @@ if (!window.vkBridge) {
     musicWanted: false,
     round: null,
     continuesUsed: 0, doubled: false, combo5Coins: 0,
+    zenExtUsed: false,   /* A3 v6.3: «+30 сек» в дзене — один раз за раунд */
     fruits: null, halves: null, parts: null, popups: null, splats: null, fx: null,
     halfCache: null,
     input: null,
@@ -2436,11 +2548,15 @@ if (!window.vkBridge) {
     duelTarget: null, duelWin: null,
     buttons: [], scroll: 0, scrollTarget: 0, scrollMax: 0, dragging: false, dragStart: 0, dragScroll0: 0,
     toasts: [], tutStep: 0, tutSpawnT: 0, tutDone: false,
-    adGate: { lastInterstitial: -1e9, shown: 0, sessionStart: 0, playTime: 0 },
+    adGate: { lastInterstitial: -1e9, shown: 0, sessionStart: 0, playTime: 0, lastReward: -1e9 },
     confirm: null,
     /* game-feel (v2) */
     pulse: 0, hitstop: 0, fade: 0, fadeDir: 0, pendingScreen: null,
     _sawMenu: false, _bannerRequested: false, consentDeclined: false,
+    /* v6.3: сессионные флаги монетизации/возврата (не сохраняются) */
+    _fxAutoDone: false, _fxHot: 0,                       /* D2: авто-дегрейд fx */
+    _top10Toasted: false,                                 /* C2: тост топ-10 */
+    _recShare: { done: false, gap: 3 },                   /* C1: ≤1 за сессию, ≤1/3 раунда */
     juiceC: '#ff9420', juiceV: 0,
     fever: 0, feverT: 0,
     menuT: 0, scorePop: 0, goAnim: 0,
@@ -3220,6 +3336,7 @@ if (!window.vkBridge) {
     Game.fever = 0; Game.feverT = 0; Snd.intensity = 0;
     Game.pulse = 0; Game.hitstop = 0; Game.scorePop = 0; Game.goAnim = 0;
     Game.continuesUsed = 0; Game.doubled = false; Game.combo5Coins = 0; Game.roundCoins = 0;
+    Game.zenExtUsed = false;   /* A3 v6.3: сброс «+30 сек» за раунд */
     Game.acc = 0; Game._acc = 0; Game.roundG = 0;
     if (opt.seed !== undefined && opt.seed !== null) {
       Game.roundSeed = opt.seed >>> 0;
@@ -3320,6 +3437,17 @@ if (!window.vkBridge) {
 
     var newAch = Achievements.check();
     Store.data.blade_trial = null;
+    /* A2 v6.3: после сброса пробы не оставляем «надетым» лезвие, которым
+       игрок не владеет (проба давала owned() на один раунд) */
+    if (!Blades.owned(Store.data.blade_equipped)) Store.data.blade_equipped = 'classic';
+    /* B2 v6.3: крючок возврата — ближайшая невзятая награда (квесты/ачивки) */
+    var hookReward = Game.nearestReward();
+    /* C1 v6.3: предложение шеринга рекорда — не чаще 1 раза за сессию
+       и не чаще 1 раза за 3 раунда (не форсируем) */
+    var rs = Game._recShare;
+    rs.gap++;
+    var shareOffer = !!(isRecord && !rs.done && rs.gap >= 3);
+    if (shareOffer) { rs.done = true; rs.gap = 0; }
     Store.flush();
 
     Game.go = {
@@ -3327,11 +3455,17 @@ if (!window.vkBridge) {
       isRecord: isRecord, fruits: r.fruits || 0, maxCombo: r.maxCombo || 0,
       misses: r.misses || 0, bombs: r.bombs || 0, coins: Game.roundCoins,
       newAch: newAch.map(function (a) { return { id: a.id, coins: a.coins }; }),
-      canContinue: (mode === 'classic' && Game.continuesUsed < 1),
+      /* E2 v6.3: второй continue в классике — по повышенной цене (×1.6) */
+      canContinue: (mode === 'classic' && Game.continuesUsed < 2),
       canDouble: !Game.doubled && Game.score > 0,
-      time: r.t || 0, doubled: false, xp: xpGain, rank: Game.lbRank || null
+      time: r.t || 0, doubled: false, xp: xpGain, rank: Game.lbRank || null,
+      coinsDoubled: false,          /* A1 v6.3: ×2 монеты — один раз за раунд */
+      zenExt: Game.zenExtUsed,      /* A3 v6.3: «+30 сек» уже использовано */
+      hook: hookReward,             /* B2 v6.3 */
+      shareOffer: shareOffer        /* C1 v6.3 */
     };
     Levels.add(xpGain);
+    if (shareOffer) Game.toast(I18N.t('new_record'), I18N.t('share_rec_toast'), '#ffd84d');
     /* отправка результата в лидерборд площадки */
     if (Game.platform && Game.platform.lbSubmit) {
       try {
@@ -3339,6 +3473,11 @@ if (!window.vkBridge) {
           if (res && res.rank) {
             Game.lbRank = res.rank;
             if (Game.go) { Game.go.rank = res.rank; }
+            /* C2 v6.3: тост при входе в топ-10 недели (один раз за сессию) */
+            if (res.rank <= 10 && !Game._top10Toasted) {
+              Game._top10Toasted = true;
+              Game.toast(I18N.t('rating_top'), I18N.t('rank_top10'), '#ffdf6b');
+            }
             if (Game.screen === 'gameover') Game.layoutScreen();
           }
         })['catch'](function () {});
@@ -3370,7 +3509,11 @@ if (!window.vkBridge) {
       Store.data.best_scores[mode] = Game.go.score;
       Game.go.isRecord = true; Game.go.best = Game.go.score;
     }
-    var extra = Math.floor(add / 100) * CFG.coinPer100;
+    /* A1 v6.3: ×2 начисляет ВСЕ монеты раунда ещё раз (очки + комбо).
+       Флаг go.coinsDoubled — строго один раз за раунд. Строка go_coins на
+       экране итогов обновляется из Game.go.coins автоматически. */
+    var extra = Game.go.coinsDoubled ? 0 : Game.roundCoins;
+    Game.go.coinsDoubled = true;
     Store.addCoins(extra);
     Game.go.coins += extra;
     Store.data.stats.total_score += add;
@@ -3381,6 +3524,36 @@ if (!window.vkBridge) {
     Snd.play('buy');
     Game.toast(I18N.t('doubled'), '+' + add, '#ffd84d');
     return true;
+  };
+
+  /* B2 v6.3: ближайшая НЕвзятая награда по существующим данным (Quests +
+     Achievements) — минимальный остаток. Строка на экране game over:
+     «До награды: 2 комбо» (i18n hook_next + hn_*). Без новых систем. */
+  Game.nearestReward = function () {
+    var best = null;
+    try {
+      var qs = Quests.list();
+      for (var i = 0; i < qs.length; i++) {
+        var q = qs[i];
+        if (q.claimed || q.cur >= q.goal) continue;
+        var rem = q.goal - q.cur;
+        if (rem > 0 && (!best || rem < best.n)) best = { n: rem, key: 'hn_' + q.type };
+      }
+      var al = Achievements.list;
+      for (var j = 0; j < al.length; j++) {
+        var a = al[j];
+        if (Achievements.has(a.id)) continue;
+        var rem2 = a.goal - Achievements.progress(a);
+        if (rem2 > 0 && (!best || rem2 < best.n)) best = { n: rem2, key: 'hn_' + a.type };
+      }
+    } catch (e) { }
+    return best;
+  };
+
+  /* E2 v6.3: эскалация цены continue: 1-й = CFG.continueCost (500),
+     2-й = ×CFG.continueCostMult (1.6) → 800. Защита экономики. */
+  Game.continuePrice = function () {
+    return Math.round(CFG.continueCost * (Game.continuesUsed >= 1 ? (CFG.continueCostMult || 1.6) : 1));
   };
 
   Game.doContinue = function () {
@@ -3431,6 +3604,10 @@ if (!window.vkBridge) {
     if (Game.sessionTime - g.sessionStart < CFG.interstitialGrace) return false;
     if (Game.sessionTime - g.lastInterstitial < CFG.interstitialCooldown) return false;
     if (g.shown >= CFG.maxInterstitialPerSession) return false;
+    /* A4 v6.3: анти-двойная-реклама — interstitial НЕ показывается, если с
+       последнего rewarded прошло меньше CFG.rewardedShield (60) секунд.
+       Существующие пороги кулдаунов не изменены. */
+    if (Game.sessionTime - g.lastReward < CFG.rewardedShield) return false;
     return true;
   };
 
@@ -3475,6 +3652,10 @@ if (!window.vkBridge) {
     var got = false, done = false;
     function finish(ok) {
       if (done) return; done = true;
+      /* A4 v6.3: помечаем момент последнего успешного rewarded —
+         canInterstitial() не покажет interstitial раньше +60с.
+         Награда, выданная в onReward, никогда не отзывается (D3). */
+      if (ok) Game.adGate.lastReward = Game.sessionTime;
       Game.setPaused(false, 'ad');
       Game.logMsg('rewarded:' + (reason || '') + ':' + (ok ? 'ok' : 'fail'));
       if (cb) cb(ok);
@@ -4034,7 +4215,7 @@ if (!window.vkBridge) {
         add(B('event', xx, y2, ew2, eh2, I18N.t('event_title') + ': ' + I18N.bladeName(ev.id),
           function () { Game.openEvent(); }, 'ghost', { tint: ev.tint }));
         add(B('daily', xx + ew2 + g2, y2, dw2, eh2,
-          I18N.t('daily_claim') + ' +' + CFG.dailyBonus, function () { Game.claimDaily(); }, 'gold', { icon: 'coin.png' }));
+          I18N.t('daily_claim') + ' +' + Daily.streakBonus(Store.data.daily.streak), function () { Game.claimDaily(); }, 'gold', { icon: 'coin.png' }));
       } else {
         if (ev) {
           var ew = u * 0.62, eh = uc * 0.075;
@@ -4044,7 +4225,7 @@ if (!window.vkBridge) {
         }
         if (canDaily) {
           add(B('daily', cx - bw * 0.62 / 2, y2, bw * 0.62, uc * 0.085,
-            I18N.t('daily_claim') + ' +' + CFG.dailyBonus, function () { Game.claimDaily(); }, 'gold', { icon: 'coin.png' }));
+            I18N.t('daily_claim') + ' +' + Daily.streakBonus(Store.data.daily.streak), function () { Game.claimDaily(); }, 'gold', { icon: 'coin.png' }));
         }
       }
       var lw = u * 0.10;
@@ -4093,6 +4274,12 @@ if (!window.vkBridge) {
     if (s === 'shop' || s === 'ach' || s === 'settings' || s === 'quests' || s === 'rating' || s === 'event' || s === 'dex' || s === 'duel') {
       var headH = u * (Game.headShiftFor(s) ? 0.21 : 0.16);
       var la = { x: 0, y: headH + Game.topInset(), w: W, h: H - headH - Game.topInset() - u * 0.04 - Game.bottomInset() };
+      /* B1 v6.3: экран заданий — полоса стрик-чипов (7 ячеек) между
+         заголовком и списком; список сдвигается вниз, пересечений нет */
+      if (s === 'quests') {
+        var chipH = Game.streakChipH();
+        la = { x: la.x, y: la.y + chipH, w: la.w, h: Math.max(u * 0.2, la.h - chipH) };
+      }
       UI.listArea = la;
       if (s === 'shop') Game.layoutShop(la);
       else if (s === 'ach') Game.layoutAch(la);
@@ -4134,13 +4321,24 @@ if (!window.vkBridge) {
     if (s === 'paused') {
       var pw = Math.min(W * 0.78, u * 0.95), ph = u * 0.115;
       var py = H * 0.34;
+      /* A3 v6.3: в дзене — rewarded-кнопка «+30 секунд» (один раз за раунд).
+         Когда она есть, стек кнопок начинается чуть выше, а иконки звука
+         опускаются — всё остаётся в безопасной зоне; D3: без доступного
+         rewarded кнопки нет. */
+      var zenExtBtn = (Game.mode === 'zen' && !Game.zenExtUsed && Game.adsAvailable('rewarded'));
+      if (zenExtBtn) py -= ph * 0.35;
       add(B('resume', cx - pw / 2, py, pw, ph, I18N.t('resume'), function () { Game.togglePause(); }, 'primary'));
       add(B('restart', cx - pw / 2, py + ph * 1.25, pw, ph, I18N.t('retry'), function () { Game.restartFromPause(); }, 'ghost'));
       add(B('tomenu', cx - pw / 2, py + ph * 2.5, pw, ph, I18N.t('menu'), function () { Game.toMenu(true); }, 'ghost'));
+      if (zenExtBtn) {
+        add(B('zen_ext', cx - pw / 2, py + ph * 3.62, pw, ph * 0.9, '🎬 ' + I18N.t('zen_ext'),
+          function () { Game.rewardZenExt(); }, 'gold', { icon: 'ui_ad.png' }));
+      }
       var sw = u * 0.11;
-      add(B('psnd', cx - sw - 8, py + ph * 3.8, sw, sw, '', function () { Game.toggleSound(); }, 'icon',
+      var iy = py + ph * (zenExtBtn ? 4.78 : 3.8);
+      add(B('psnd', cx - sw - 8, iy, sw, sw, '', function () { Game.toggleSound(); }, 'icon',
         { icon: Store.data.settings.sound ? 'ui_sound_on.png' : 'ui_sound_off.png' }));
-      add(B('pmus', cx + 8, py + ph * 3.8, sw, sw, '', function () { Game.toggleMusic(); }, 'icon',
+      add(B('pmus', cx + 8, iy, sw, sw, '', function () { Game.toggleMusic(); }, 'icon',
         { icon: Store.data.settings.music ? 'ui_sound_on.png' : 'ui_sound_off.png', sub: I18N.t('set_music') }));
       return;
     }
@@ -4150,28 +4348,51 @@ if (!window.vkBridge) {
       var gh = u * (L ? 0.085 : 0.105);
       var gx = L ? (W * 0.55 + (W * 0.40 - gw) / 2) : cx - gw / 2;
       var go = Game.go || {};
+      /* A3 v6.3: продление дзена на экране итогов (один раз за раунд) */
+      var zenRow = (go.mode === 'zen' && !go.zenExt && Game.adsAvailable('rewarded'));
       /* п. 3.2.2: панель результатов целиком внутри безопасной зоны —
          считаем высоту всех рядов и прижимаем блок вверх, если не влезает */
       var goRows = 1 + ((go.canContinue && Game.adsAvailable('rewarded')) ? 1 : 0) +
         (go.canContinue ? 1 : 0) + ((go.canDouble && Game.adsAvailable('rewarded')) ? 1 : 0) +
+        (zenRow ? 1 : 0) + (go.shareOffer ? 0.85 : 0) +
         ((Game.mode === 'duel' || Store.data.replay) ? 0.85 : 0);
       var goNeed = gh * 1.18 * goRows;
       var goBottomGap = Game.bottomInset() + u * 0.035;
       var goPanelBottom = L ? (H * 0.12 + H * 0.76) : (H * 0.055 + H * 0.46);
-      var gy = Math.min(H * (L ? 0.24 : 0.50),
-        Math.min(goPanelBottom, H - goBottomGap) - goNeed);
-      gy = Math.max(H * (L ? 0.14 : 0.30), gy);
+      var gy;
+      if (L) {
+        gy = Math.min(H * 0.24, Math.min(goPanelBottom, H - goBottomGap) - goNeed);
+        gy = Math.max(H * 0.14, gy);
+      } else {
+        /* v6.3: в портрете панель результатов занимает верх экрана, поэтому
+           кнопки — СТРОГО ниже её нижней кромки (раньше при большом числе
+           рядов они наезжали на строки панели: ранг/XP/монеты). Не хватает
+           высоты — сжимаем высоту рядов (не ниже u*0.075). */
+        var gyTop = goPanelBottom + u * 0.02;
+        var availB = H - goBottomGap - gyTop;
+        if (goNeed > availB) {
+          gh = Math.max(u * 0.075, gh * (availB / goNeed));
+          goNeed = gh * 1.18 * goRows;
+        }
+        gy = gyTop;
+      }
       if (go.canContinue) {
         if (Game.adsAvailable('rewarded')) {
           add(B('cont_ad', gx, gy, gw, gh, I18N.t('continue_ad'), function () { Game.rewardContinue(); }, 'gold', { icon: 'ui_ad.png' }));
           gy += gh * 1.18;
         }
-        add(B('cont_coin', gx, gy, gw, gh, I18N.t('continue_coins'), function () { Game.coinContinue(); },
-          Store.data.coins >= CFG.continueCost ? 'primary' : 'disabled'));
+        /* E2 v6.3: цена continue растёт: 1-й = 500, 2-й = 800 (×1.6) */
+        add(B('cont_coin', gx, gy, gw, gh, I18N.t('continue_coins_n', { n: Game.continuePrice() }), function () { Game.coinContinue(); },
+          Store.data.coins >= Game.continuePrice() ? 'primary' : 'disabled'));
         gy += gh * 1.18;
       }
       if (go.canDouble && Game.adsAvailable('rewarded')) {
-        add(B('double', gx, gy, gw, gh, I18N.t('double_ad'), function () { Game.rewardDouble(); }, 'gold', { icon: 'ui_ad.png' }));
+        /* A1 v6.3: удвоение начисляет и очки, и монеты (подпись double_coins) */
+        add(B('double', gx, gy, gw, gh, I18N.t('double_coins'), function () { Game.rewardDouble(); }, 'gold', { icon: 'ui_ad.png' }));
+        gy += gh * 1.18;
+      }
+      if (zenRow) {
+        add(B('zen_ext', gx, gy, gw, gh, '🎬 ' + I18N.t('zen_ext'), function () { Game.rewardZenExt(); }, 'gold', { icon: 'ui_ad.png' }));
         gy += gh * 1.18;
       }
       var shW = gh;
@@ -4180,6 +4401,13 @@ if (!window.vkBridge) {
       add(B('menu', gx + half + 8, gy, half, gh, I18N.t('menu'), function () { Game.toMenu(true); }, 'ghost'));
       add(B('share', gx + gw - shW, gy, shW, gh, '', function () { Game.share(); }, 'icon', { icon: 'ui_share.png' }));
       gy += gh * 1.18;
+      /* C1 v6.3: рекорд — явное предложение поделиться (не чаще 1 раза за
+         сессию и 1 раза за 3 раунда); переиспользует Game.share:
+         карточка → gp.socials → navigator.share → буфер обмена */
+      if (go.shareOffer) {
+        add(B('share_rec', gx, gy, gw, gh * 0.85, I18N.t('share_card'), function () { Game.share(); }, 'gold', { icon: 'ui_share.png' }));
+        gy += gh * 1.02;
+      }
       var third = (gw - 16) / 3;
       if (Game.mode === 'duel') {
         add(B('shareduel', gx, gy, third, gh * 0.85, I18N.t('duel'), function () { Game.shareDuel(); }, 'gold'));
@@ -4234,10 +4462,22 @@ if (!window.vkBridge) {
 
   Game.layoutShop = function (la) {
     var W = Game.W, u = Game.unit, L = Game.orient === 'landscape';
-    var cols = L ? 6 : 4;
+    /* A2 v6.3: на карточках ЗАКРЫТЫХ лезвий — кнопка «🎬 Пробный раунд»
+       (rewarded → blade_trial на 1 раунд). В портрете карточка становится
+       выше, а колонок 3 — чтобы кегль подписи остался ≥ 8px (п. 3.3.3).
+       D3: реклама недоступна → полос нет, прежняя раскладка 4 колонки. */
+    var trialAny = false;
+    if (Game.adsAvailable('rewarded')) {
+      for (var ti = 0; ti < I18N.BLADES.length; ti++) {
+        var tb = I18N.BLADES[ti];
+        if (!Blades.owned(tb.id) && !tb.event) { trialAny = true; break; }
+      }
+    }
+    var cols = L ? 6 : (trialAny ? 3 : 4);
     var pad = u * 0.03;
     var cw = (W - pad * (cols + 1)) / cols;
-    var chh = cw * 1.12;
+    var chh = cw * (trialAny ? 1.34 : 1.12);
+    var h0 = cw * 1.12;   /* «старая» высота — внутренняя раскладка карточки */
     var list = I18N.BLADES;
     for (var i = 0; i < list.length; i++) {
       var b = list[i];
@@ -4250,7 +4490,15 @@ if (!window.vkBridge) {
           return function () { Game.bladeClick(blade); };
         })(b),
         owned ? (Store.data.blade_equipped === b.id ? 'cell_on' : 'cell') : (can ? 'cell_buy' : 'cell_lock'),
-        { list: true, tag: b.id, blade: b, owned: owned, can: can }));
+        { list: true, tag: b.id, blade: b, owned: owned, can: can, h0: trialAny ? h0 : chh }));
+      if (trialAny && !owned && !b.event) {
+        Game.buttons.push(B('trial_' + b.id, cxx + cw * 0.06, cyy + h0 + cw * 0.025, cw * 0.88, cw * 0.17,
+          '🎬 ' + I18N.t('trial_ad'),
+          (function (blade) {
+            return function () { Game.rewardBladeTrialFor(blade); };
+          })(b),
+          'gold', { list: true, tag: b.id }));
+      }
     }
     var rows = Math.ceil(list.length / cols);
     Game.contentH = la.y + pad + rows * (chh + pad);
@@ -4284,7 +4532,11 @@ if (!window.vkBridge) {
         (q.claimed ? 'row_on' : (q.cur >= q.goal ? 'row_claim' : 'row')),
         { list: true, quest: q, idx: i }));
     }
-    Game.contentH = la.y + pad + qs.length * (rh + pad * 0.6) + rh;
+    /* B3 v6.3: «дуэль дня» — общий сид дня, переиспользует механику дуэлей */
+    var yD = la.y + pad + qs.length * (rh + pad * 0.6);
+    Game.buttons.push(B('duel_daily', pad, yD, W - pad * 2, rh * 0.8,
+      '⚔ ' + I18N.t('duel_daily'), function () { Game.duelDaily(); }, 'gold', { list: true }));
+    Game.contentH = yD + rh * 0.8 + pad;
     Game.scrollMax = Math.max(0, Game.contentH - (la.y + la.h));
   };
 
@@ -4413,6 +4665,7 @@ if (!window.vkBridge) {
       ['mirror', I18N.t('mirror'), Store.data.settings.mirror ? I18N.t('on') : I18N.t('off'), function () { Game.toggleMirror(); }],
       ['cb', I18N.t('cb'), Store.data.settings.cb ? I18N.t('on') : I18N.t('off'), function () { Game.toggleCb(); }],
       ['set', I18N.t('set_name'), Game.setLabel(), function () { Game.cycleSet(); }],
+      ['theme', I18N.t('set_theme'), Game.themeLabel(), function () { Game.cycleTheme(); }],
       ['policy', I18N.t('set_policy'), '', function () { Game.openPolicy(); }],
       ['age', I18N.t('age_category'), CFG.ageRating, null],
       ['delete', I18N.t('set_delete'), '', function () { Game.askDelete(); }, 'danger'],
@@ -4482,6 +4735,19 @@ if (!window.vkBridge) {
     Game.duelTarget = (target !== null && isFinite(target)) ? target : null;
     Game.duelCode = seed;
     Game.startRound('duel', { seed: seed });
+  };
+  /* B3 v6.3: «дуэль дня» — сид от ключа дня (Daily.today), один на всех.
+     Полностью переиспользует механику дуэлей (duelStart); новый режим НЕ
+     создаётся. Вызов другу уходит существующей кнопкой shareDuel на экране
+     итогов — текст duel_share автоматически несёт код дня (Game.duelCode). */
+  Game.duelDaily = function () {
+    var seed = Events.seedOf('duel-day-' + Daily.today()) % 1000000000;
+    Game.duelBuf = String(seed);
+    Store.data.duels.created++;
+    Store.save();
+    Game.duelStart();
+    Game.toast(I18N.t('duel'), I18N.t('duel_code', { code: seed }), '#ffd75a');
+    Game.logMsg('duel-daily:' + seed);
   };
   Game.shareDuel = function () {
     var code = Game.duelCode || Game.roundSeed;
@@ -4750,6 +5016,59 @@ if (!window.vkBridge) {
     Store.data.settings.fx = Store.data.settings.fx === 'low' ? 'full' : 'low';
     Store.save(); Game.layoutScreen(); Snd.play('ui');
   };
+  /* ------------- E1 v6.3: косметические темы фона (sink монет) ----------
+     5 тем (1 бесплатная + 4 за монеты), tint-оверлей поверх bg_* рядом с
+     modeTint-логикой. Покупка — через существующий confirm-экран. */
+  Game.themeById = function (id) {
+    for (var i = 0; i < THEMES.length; i++) if (THEMES[i].id === id) return THEMES[i];
+    return THEMES[0];
+  };
+  Game.themesState = function () {
+    if (!Store.data.themes || !Store.data.themes.owned) {
+      Store.data.themes = { owned: ['default'], equipped: 'default' };
+    }
+    if (Store.data.themes.owned.indexOf('default') < 0) Store.data.themes.owned.push('default');
+    return Store.data.themes;
+  };
+  Game.themeCur = function () { return Game.themeById(Game.themesState().equipped || 'default'); };
+  Game.themeLabel = function () { return I18N.t('th_' + Game.themeCur().id); };
+  Game.cycleTheme = function () {
+    var th = Game.themesState();
+    var idx = 0;
+    for (var i = 0; i < THEMES.length; i++) if (THEMES[i].id === th.equipped) idx = i;
+    var next = THEMES[(idx + 1) % THEMES.length];
+    if (th.owned.indexOf(next.id) >= 0) {
+      th.equipped = next.id;
+      Store.save(); Snd.play('ui');
+      Game.toast(I18N.t('theme_on', { name: I18N.t('th_' + next.id) }), '', next.tint || '#ffdf6b');
+      Game.layoutScreen();
+      return;
+    }
+    if (Store.data.coins < next.cost) {
+      Snd.play('back');
+      Game.toast(I18N.t('not_enough_coins'), I18N.t('th_' + next.id) + ' — ' + next.cost + ' ⬤', '#ff8fa3');
+      return;
+    }
+    Game.confirm = {
+      text: I18N.t('theme_buy_q', { name: I18N.t('th_' + next.id), cost: next.cost }),
+      returnTo: 'settings',
+      onYes: function () {
+        if (Store.spend(next.cost)) {
+          th.owned.push(next.id);
+          th.equipped = next.id;
+          Store.save();
+          Snd.play('buy');
+          Game.toast(I18N.t('theme_bought', { name: I18N.t('th_' + next.id) }), '', '#8dffbe');
+          Game.confetti(Game.W / 2, Game.H * 0.4, 20, [next.tint || '#ffdf6b', '#ffffff', '#ffd84d']);
+        } else {
+          Game.toast(I18N.t('not_enough_coins'), '', '#ff8fa3');
+        }
+        Game.layoutScreen();
+      }
+    };
+    Game.screen = 'confirm';
+    Game.layoutScreen();
+  };
   Game.toggleVibrate = function () {
     Store.data.settings.vibrate = !Store.data.settings.vibrate;
     Store.save(); Game.layoutScreen(); Snd.play('ui');
@@ -4774,7 +5093,9 @@ if (!window.vkBridge) {
     var got = Daily.claim();
     if (got > 0) {
       Snd.play('coin');
-      Game.toast(I18N.t('daily_bonus'), '+' + got + ' ⬤', '#ffdf6b');
+      /* B1 v6.3: награда = ступень стрика [30,40,50,60,70,80,100] */
+      Game.toast(I18N.t('daily_bonus') + ' · ' + I18N.t('streak_day', { n: Store.data.daily.streak }),
+        '+' + got + ' ⬤', '#ffdf6b');
       Achievements.check();
       Game.layoutScreen();
     }
@@ -4985,7 +5306,8 @@ if (!window.vkBridge) {
     Game.showRewarded(function () { Game.doContinue(); }, null, 'continue');
   };
   Game.coinContinue = function () {
-    if (Store.spend(CFG.continueCost)) { Snd.play('buy'); Game.doContinue(); }
+    /* E2 v6.3: цена зависит от номера continue (1-й = 500, 2-й = 800) */
+    if (Store.spend(Game.continuePrice())) { Snd.play('buy'); Game.doContinue(); }
     else { Snd.play('back'); Game.toast(I18N.t('not_enough_coins'), '', '#ff8fa3'); }
   };
   Game.rewardDouble = function () {
@@ -4996,6 +5318,52 @@ if (!window.vkBridge) {
       Game.slowmoT = CFG.slowmoRewardTime;
       Game.toast(I18N.t('slowtime_ad'), '', '#a8ecff');
     }, null, 'slowmo');
+  };
+  /* A3 v6.3: Дзен — rewarded «+30 секунд» ОДИН раз за раунд.
+     Кнопки: в паузе (время добавляется сразу) и на экране итогов дзена
+     (раунд возобновляется). Флаги: Game.zenExtUsed / go.zenExt. */
+  Game.rewardZenExt = function () {
+    if (Game.zenExtUsed || Game.mode !== 'zen') { Snd.play('back'); return; }
+    Game.showRewarded(function () {
+      Game.zenExtUsed = true;
+      if (Game.go && Game.go.mode === 'zen') Game.go.zenExt = true;
+      if (Game.screen === 'gameover' && Game.go && Game.go.mode === 'zen') {
+        Game.timeLeft = Math.max(0, Game.timeLeft) + CFG.zenExtTime;
+        Game.screen = 'playing'; Game.running = true; Game.paused = false; Game.acc = 0;
+        if (Game.round) { Game.round.nextSpawn = 0.4; Game.round.spawnAcc = 1; }
+        Game.layoutScreen();
+        Game.fade = 1; Game.fadeDir = -1;
+        if (Game.platform && Game.platform.gameplayStart) {
+          try { var p = Game.platform.gameplayStart(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+        }
+        Snd.play('start');
+        Game.logMsg('zen-ext:resume');
+      } else {
+        Game.timeLeft += CFG.zenExtTime;
+        Game.toast(I18N.t('zen_ext'), '+' + CFG.zenExtTime, '#5cff9d');
+        if (Game.screen === 'paused') Game.togglePause();
+        Game.logMsg('zen-ext:pause');
+      }
+    }, null, 'zen-ext');
+  };
+  /* A2 v6.3: пробный раунд за рекламу для КОНКРЕТНОГО закрытого лезвия
+     (кнопка «🎬 Пробный раунд» в карточке магазина). trialBlade действует
+     ОДИН раунд: Store.data.blade_trial сбрасывается в endRound (существующий
+     механизм Blades.trial/clearTrial). */
+  Game.rewardBladeTrialFor = function (bl) {
+    if (!bl || Blades.owned(bl.id)) { Snd.play('back'); return; }
+    if (!Game.adsAvailable('rewarded')) {
+      /* D3: реклама недоступна — кнопка не показывается; защита от гонки */
+      Game.toast(I18N.t('no_ads'), I18N.t('adblock_note'), '#ff8fa3');
+      Snd.play('back');
+      return;
+    }
+    var trialBlade = bl.id;
+    Game.showRewarded(function () {
+      Blades.trial(trialBlade);
+      Game.toast(I18N.bladeName(trialBlade), I18N.t('blade_free_trial'), bl.c1);
+      Game.layoutScreen();
+    }, null, 'blade-trial');
   };
   Game.rewardBladeTrial = function () {
     var locked = [];
@@ -5213,6 +5581,17 @@ if (!window.vkBridge) {
     ctx.fillStyle = Game.modeTint();
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
+
+    /* E1 v6.3: tint выбранной темы фона — поверх bg_menu/bg_game/bg_shop
+       и режимного тинта (modeTint-логика не изменена) */
+    var thE = Game.themeCur ? Game.themeCur() : null;
+    if (thE && thE.tint) {
+      ctx.save();
+      ctx.globalAlpha = 0.09;
+      ctx.fillStyle = thE.tint;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
 
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -6139,13 +6518,16 @@ if (!window.vkBridge) {
   Game.drawBladeCell = function (b, y, st) {
     var ctx = Game.ctx, u = Game.unit, bl = b.blade;
     var on = st === 'cell_on';
+    /* A2 v6.3: карточка могла стать выше (полоса «🎬 Пробный раунд») —
+       внутренняя раскладка считается от «старой» высоты h0, рамка — от b.h */
+    var hh = b.h0 || b.h;
     ctx.fillStyle = on ? 'rgba(255,255,255,.16)' : 'rgba(12,7,28,.55)';
     U.rr(ctx, b.x, y, b.w, b.h, b.w * 0.16); ctx.fill();
     ctx.lineWidth = Math.max(1.5, u * 0.005);
     ctx.strokeStyle = on ? '#ffffff' : (st === 'cell_lock' ? 'rgba(255,255,255,.14)' : U.rgba(bl.c1, 0.75));
     U.rr(ctx, b.x, y, b.w, b.h, b.w * 0.16); ctx.stroke();
 
-    var px = b.x + b.w / 2, py = y + b.h * 0.36, rr = b.w * 0.26;
+    var px = b.x + b.w / 2, py = y + hh * 0.36, rr = b.w * 0.26;
     ctx.save();
     ctx.translate(px, py);
     if (st !== 'cell_lock') {
@@ -6170,22 +6552,22 @@ if (!window.vkBridge) {
     ctx.fillStyle = '#fff';
     var nm = b.label;
     ctx.font = U.fitFont(ctx, nm, b.w * 0.155, U.FONT, b.w * 0.9, '800');
-    ctx.fillText(nm, b.x + b.w / 2, y + b.h * 0.70);
+    ctx.fillText(nm, b.x + b.w / 2, y + hh * 0.70);
 
     var sub = on ? I18N.t('equipped') : (b.owned ? I18N.t('equip') : (bl.cost ? String(bl.cost) : I18N.t('free')));
     ctx.font = '800 ' + (b.w * 0.135) + 'px ' + U.FONT;
     if (!b.owned) {
-      Game.drawIcon('coin.png', b.x + b.w / 2 - ctx.measureText(sub).width / 2 - b.w * 0.11, y + b.h * 0.845 - b.w * 0.05, b.w * 0.10);
+      Game.drawIcon('coin.png', b.x + b.w / 2 - ctx.measureText(sub).width / 2 - b.w * 0.11, y + hh * 0.845 - b.w * 0.05, b.w * 0.10);
       ctx.fillStyle = Store.data.coins >= bl.cost && b.can ? '#ffdf6b' : '#ff9d9d';
       ctx.textAlign = 'left';
-      ctx.fillText(sub, b.x + b.w / 2 - ctx.measureText(sub).width / 2, y + b.h * 0.85);
+      ctx.fillText(sub, b.x + b.w / 2 - ctx.measureText(sub).width / 2, y + hh * 0.85);
     } else {
       ctx.fillStyle = on ? '#b9ffcf' : 'rgba(255,255,255,.7)';
-      ctx.fillText(sub, b.x + b.w / 2, y + b.h * 0.85);
+      ctx.fillText(sub, b.x + b.w / 2, y + hh * 0.85);
     }
     if (bl.tier >= 3) {
       ctx.fillStyle = U.rgba(bl.c1, 0.9);
-      Game.starPath(ctx, b.x + b.w * 0.12, y + b.h * 0.09, b.w * 0.055, b.w * 0.025, 5);
+      Game.starPath(ctx, b.x + b.w * 0.12, y + hh * 0.09, b.w * 0.055, b.w * 0.025, 5);
       ctx.fill();
     }
   };
@@ -6531,6 +6913,7 @@ if (!window.vkBridge) {
     } else if (s === 'quests') {
       Game.drawCoins();
       Game.drawHeader(I18N.t('quest_title'), I18N.t('daily_streak', { n: Store.data.daily.streak }));
+      Game.drawStreakChips();   /* B1 v6.3: 7 ячеек серии входов */
       Game.drawScrollHint();
     } else if (s === 'event') {
       Game.drawCoins();
@@ -6749,6 +7132,17 @@ if (!window.vkBridge) {
       ctx.textAlign = 'right'; ctx.fillStyle = i === 3 ? '#ffdf6b' : '#fff';
       ctx.fillText(rows[i][1], px + pw * 0.90, yy);
     }
+    /* B2 v6.3: крючок возврата — одна строка под статистикой: сколько
+       осталось до ближайшей невзятой награды («До награды: 2 комбо») */
+    var hy = ry + rows.length * (u * 0.042);
+    if (go.hook && go.hook.n > 0) {
+      var htxt = I18N.t('hook_next', { a: go.hook.n, b: I18N.t(go.hook.key) });
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#a8ecff';
+      ctx.font = U.fitFont(ctx, htxt, u * 0.026, U.FONT, pw * 0.84, '700');
+      ctx.fillText(htxt, pcx, hy + u * 0.018);
+      hy += u * 0.036;
+    }
     /* XP-бар с анимацией заполнения */
     var stt = Store.data.stats;
     var need = FS.Levels.need(stt.level || 1);
@@ -6781,10 +7175,51 @@ if (!window.vkBridge) {
         if (ctx.measureText(tt2).width > aw && cur) { lns.push(cur); cur = ws[wi2]; } else cur = tt2;
       }
       if (cur) lns.push(cur);
-      if (lns.length > 2) { lns = lns.slice(0, 2); lns[1] += '…'; }
+      /* B2 v6.3: со строкой-крючком остаётся 1 строка достижений (без
+         пересечений с XP-блоком), иначе — прежние 2 */
+      var maxLns = (go.hook && go.hook.n > 0) ? 1 : 2;
+      if (lns.length > maxLns) { lns = lns.slice(0, maxLns); lns[maxLns - 1] += '…'; }
       for (var li2 = 0; li2 < lns.length; li2++) {
-        ctx.fillText(lns[li2], pcx, ry + rows.length * (u * 0.042) + u * 0.012 + li2 * u * 0.030, aw);
+        ctx.fillText(lns[li2], pcx, hy + u * 0.012 + li2 * u * 0.030, aw);
       }
+    }
+    ctx.restore();
+  };
+
+  /* B1 v6.3: компактная строка серии входов — 7 ячеек (стрик-чипы) между
+     заголовком экрана заданий и списком. Геометрия полосы совпадает с
+     layoutScreen (quests): список сдвинут вниз на streakChipH(). */
+  Game.streakChipH = function () { return Game.unit * 0.13; };
+
+  Game.drawStreakChips = function () {
+    var ctx = Game.ctx, u = Game.unit, W = Game.W;
+    var la = UI.listArea;
+    if (!la) return;
+    var chipH = Game.streakChipH();
+    var y0 = la.y - chipH;
+    var streak = (Store.data.daily && Store.data.daily.streak) || 0;
+    var n = 7, cwc = u * 0.075, gapc = u * 0.014;
+    var totW = n * cwc + (n - 1) * gapc;
+    if (totW > W * 0.92) { cwc = (W * 0.92 - (n - 1) * gapc) / n; totW = n * cwc + (n - 1) * gapc; }
+    var x0 = W / 2 - totW / 2;
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '800 ' + (u * 0.024) + 'px ' + U.FONT;
+    ctx.fillStyle = 'rgba(255,255,255,.78)';
+    ctx.fillText(I18N.t('streak_title') + (streak > n ? ' ×' + streak : ''), W / 2, y0 + u * 0.030, W * 0.8);
+    var ch = u * 0.056, cy = y0 + u * 0.062;
+    var cur = streak > 0 ? ((streak - 1) % n) + 1 : 0;
+    for (var i = 0; i < n; i++) {
+      var x = x0 + i * (cwc + gapc);
+      var doneD = (i + 1) <= Math.min(streak, n);
+      ctx.fillStyle = doneD ? 'rgba(255,223,107,.26)' : 'rgba(255,255,255,.07)';
+      U.rr(ctx, x, cy, cwc, ch, cwc * 0.22); ctx.fill();
+      ctx.lineWidth = Math.max(1, u * 0.003);
+      ctx.strokeStyle = (i + 1) === cur ? '#ffdf6b' : (doneD ? 'rgba(255,223,107,.5)' : 'rgba(255,255,255,.14)');
+      U.rr(ctx, x, cy, cwc, ch, cwc * 0.22); ctx.stroke();
+      ctx.fillStyle = doneD ? '#ffdf6b' : 'rgba(255,255,255,.55)';
+      ctx.font = '900 ' + (u * 0.026) + 'px ' + U.FONT;
+      ctx.fillText(String(i + 1), x + cwc / 2, cy + ch / 2);
     }
     ctx.restore();
   };
@@ -7024,6 +7459,27 @@ if (!window.vkBridge) {
       var sum = 0, n = Math.min(60, pf.ftN);
       for (var i = 0; i < n; i++) sum += pf.ftBuf[(pf.ftI - 1 - i + pf.ftBuf.length) % pf.ftBuf.length];
       pf.fps = n > 0 ? 1000 / (sum / n) : 60;
+      /* D2 v6.3: авто-дегрейд эффектов — если средняя длительность кадра
+         (perf.avgFrameMs по последним 60 кадрам) устойчиво > 22 мс в течение
+         5 секунд и fx === 'full' → один раз за сессию ставим fx='low' + тост.
+         Якоря: Game.perf (ftBuf), toggleFx (settings.fx). */
+      var avgMs = n > 0 ? sum / n : 0;
+      if (!Game._fxAutoDone && pf.ftN >= 120 &&
+          Store.data && Store.data.settings && Store.data.settings.fx === 'full') {
+        if (avgMs > 22) {
+          Game._fxHot += 15 * avgMs / 1000;
+          if (Game._fxHot >= 5) {
+            Game._fxAutoDone = true;
+            Store.data.settings.fx = 'low';
+            Store.save();
+            Game.toast(I18N.t('fx_auto'), '', '#a8ecff');
+            Game.logMsg('fx-auto-degrade:' + avgMs.toFixed(1) + 'ms');
+            if (Game.screen === 'settings') Game.layoutScreen();
+          }
+        } else {
+          Game._fxHot = 0;
+        }
+      }
     }
   };
 
@@ -7316,6 +7772,11 @@ if (!window.vkBridge) {
     Game.sessionTime = 0;
     Game.adGate.sessionStart = 0;
     Game.adGate.lastInterstitial = -1e9;
+    Game.adGate.lastReward = -1e9;   /* A4 v6.3 */
+    /* v6.3: сброс сессионных флагов монетизации/возврата */
+    Game._fxAutoDone = false; Game._fxHot = 0;
+    Game._top10Toasted = false;
+    Game._recShare = { done: false, gap: 3 };
     Game.startLoop();
 
     var watchdog = setTimeout(function () {
@@ -7383,7 +7844,7 @@ if (!window.vkBridge) {
           progress: Game.round.progress, perMin: Game.round.lastPerMin || 0,
           goldSpawned: Game.round.goldSpawned, goldSliced: Game.round.goldSliced
         } : null,
-        go: Game.go ? { score: Game.go.score, best: Game.go.best, coins: Game.go.coins, isRecord: Game.go.isRecord, canContinue: Game.go.canContinue, canDouble: Game.go.canDouble } : null,
+        go: Game.go ? { score: Game.go.score, best: Game.go.best, coins: Game.go.coins, isRecord: Game.go.isRecord, canContinue: Game.go.canContinue, canDouble: Game.go.canDouble, coinsDoubled: Game.go.coinsDoubled, zenExt: Game.go.zenExt, hook: Game.go.hook, shareOffer: Game.go.shareOffer } : null,
         boot: { done: Game.bootDone, reason: Game.bootReason, error: Game.bootError || null, assets: Assets.loaded + '/' + Assets.total, missing: Object.keys(Assets.missing) },
         platform: Game.platform ? { name: Game.platform.name, cloud: !!Game.platform.cloud, log: (Game.platform.log || []).slice(-12) } : null
       };
