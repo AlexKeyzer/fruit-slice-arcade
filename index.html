@@ -149,10 +149,13 @@ if (!window.vkBridge) {
       modes_title: 'Выберите режим',
       mode_classic: 'Классика',
       mode_classic_desc: '3 жизни. Режь фрукты, не пропускай их и берегись бомб.',
+      mode_classic_desc_s: '3 жизни',
       mode_arcade: 'Аркада',
       mode_arcade_desc: '60 секунд на максимум очков. Бомбы — лишь −10 очков.',
+      mode_arcade_desc_s: '60 секунд',
       mode_zen: 'Дзен',
       mode_zen_desc: 'Без бомб и без жизней. Чистый релакс и длинные комбо.',
+      mode_zen_desc_s: 'Без бомб',
       lives: 'Жизни',
       time_left: 'Время',
       combo: 'КОМБО',
@@ -275,6 +278,8 @@ if (!window.vkBridge) {
       boss_hint: 'Гигант: нужно 3 точных среза',
       boss_hit: 'УДАР!',
       duel: 'Дуэль',
+      duel_desc: 'Один сид на двоих по коду друга. Кто нарежет больше — тот победил.',
+      duel_desc_s: 'По коду с другом',
       duel_create: 'Создать дуэль',
       duel_enter: 'Ввести код',
       duel_code: 'Код: {code}',
@@ -285,6 +290,7 @@ if (!window.vkBridge) {
       duel_share: 'Вызов принят? Код {code}: мой счёт {score}. Побьёшь на том же сиде?',
       daily_mode: 'День',
       daily_desc: 'Один сид на всех игроков. Лучший счёт дня — в рейтинге.',
+      daily_desc_s: 'Сид дня',
       daily_best_today: 'Сегодня: {n}',
       event_title: 'Событие сезона',
       event_left: 'Осталось дней: {n}',
@@ -1282,7 +1288,7 @@ if (!window.vkBridge) {
   /* ===================== ЧАСТЬ A: КОНФИГ, УТИЛИТЫ, АССЕТЫ, ЗВУК ======== */
 
   var CFG = {
-    version: '6.2.3',
+    version: '6.2.4',
     saveKey: 'fs_save_v1',
     schema: 3,
     /* Зазор между липким баннером и элементами интерфейса, px (п. 5.1.4.2г) */
@@ -3960,6 +3966,7 @@ if (!window.vkBridge) {
     var W = Game.W, H = Game.H, u = Game.unit, L = Game.orient === 'landscape';
     Game.buttons = [];
     UI.listArea = null;
+    UI.backRect = null;
     Game.scroll = 0; Game.scrollTarget = 0; Game.scrollMax = 0;
     var add = function (b) { Game.buttons.push(b); return b; };
     var cx = W / 2;
@@ -4041,38 +4048,45 @@ if (!window.vkBridge) {
         }
       }
       var lw = u * 0.10;
-      var bi = Game.bottomInset();   /* системная панель снизу / липкий баннер */
-      /* звук: в альбомной ориентации — правый нижний угол, вне зоны рекордов */
-      if (L) add(B('snd', W - lw - u * 0.03 - Game.sideInset('right'), H - lw * 0.62 - u * 0.03 - bi, lw, lw * 0.62, '',
-        function () { Game.toggleSound(); }, 'ghost',
-        { icon: Store.data.settings.sound ? 'ui_sound_on.png' : 'ui_sound_off.png' }));
-      else add(B('snd', cx - lw / 2, H - lw - H * 0.045 - bi, lw, lw * 0.62, '',
+      /* v6.2.4: звук — компактный значок в верхнем левом углу рядом с
+         полосой уровня; низ экрана полностью свободен от меню и надписей */
+      add(B('snd', Math.max(10, u * 0.03) + Game.sideInset('left'), Math.max(10, u * 0.03) + Game.topInset(), lw, lw * 0.62, '',
         function () { Game.toggleSound(); }, 'ghost',
         { icon: Store.data.settings.sound ? 'ui_sound_on.png' : 'ui_sound_off.png' }));
       return;
     }
 
     if (s === 'modes') {
+      /* v6.2.4: экран режимов — 5 карточек (включая «Дуэль»), НИКАКИХ кнопок
+         снизу: навигация «Назад» — стрелка вверху слева (п. 3.2.2), дуэль —
+         равноправная карточка. Тексты карточек разведены по полосам без
+         пересечений (см. Game.drawModeCard). */
       var cw, ch, x, y3, i2;
       var dbNow = Store.data.daily_best;
       var modes = [
-        ['classic', I18N.t('mode_classic'), I18N.t('mode_classic_desc'), '#ff5a6e', Store.data.best_scores.classic],
-        ['arcade', I18N.t('mode_arcade'), I18N.t('mode_arcade_desc'), '#ffbe24', Store.data.best_scores.arcade],
-        ['zen', I18N.t('mode_zen'), I18N.t('mode_zen_desc'), '#5cff9d', Store.data.best_scores.zen],
-        ['daily', I18N.t('daily_mode'), I18N.t('daily_desc'), '#37f6ff', (dbNow && dbNow.date === Daily.today()) ? dbNow.score : 0]
+        ['classic', I18N.t('mode_classic'), I18N.t('mode_classic_desc'), I18N.t('mode_classic_desc_s'), '#ff5a6e', Store.data.best_scores.classic],
+        ['arcade', I18N.t('mode_arcade'), I18N.t('mode_arcade_desc'), I18N.t('mode_arcade_desc_s'), '#ffbe24', Store.data.best_scores.arcade],
+        ['zen', I18N.t('mode_zen'), I18N.t('mode_zen_desc'), I18N.t('mode_zen_desc_s'), '#5cff9d', Store.data.best_scores.zen],
+        ['daily', I18N.t('daily_mode'), I18N.t('daily_desc'), I18N.t('daily_desc_s'), '#37f6ff', (dbNow && dbNow.date === Daily.today()) ? dbNow.score : 0],
+        ['duel', I18N.t('duel'), I18N.t('duel_desc'), I18N.t('duel_desc_s'), '#ffd75a', -1]
       ];
+      var sideM = Math.max(Game.sideInset('left'), Game.sideInset('right'));
+      var tiM = Game.topInset(), biM = Game.bottomInset();
       if (L) {
-        cw = Math.min(W * 0.22, u * 0.40); ch = H * 0.56;
-        var tot = cw * 4 + cw * 0.14 * 3; x = cx - tot / 2; y3 = H * 0.15;
-        for (i2 = 0; i2 < 4; i2++) addModeCard(modes[i2], x + i2 * (cw * 1.14), y3, cw, ch);
+        var avail5 = W - sideM * 2 - u * 0.04;
+        cw = Math.min(avail5 / 5.42, u * 0.36);
+        y3 = tiM + H * 0.15;
+        ch = H - biM - H * 0.035 - y3;
+        var tot5 = cw * 5 + cw * 0.105 * 4; x = cx - tot5 / 2;
+        for (i2 = 0; i2 < 5; i2++) addModeCard(modes[i2], x + i2 * (cw * 1.105), y3, cw, ch);
       } else {
-        cw = Math.min(W * 0.86, u * 1.05); ch = H * 0.148;
-        y3 = H * 0.15;
-        for (i2 = 0; i2 < 4; i2++) addModeCard(modes[i2], cx - cw / 2, y3 + i2 * (ch + H * 0.016), cw, ch);
+        cw = Math.min(W - sideM * 2 - u * 0.04, u * 1.05);
+        y3 = tiM + H * 0.145;
+        var gapV = H * 0.012;
+        ch = Math.min(H * 0.150, (H - biM - u * 0.03 - y3 - gapV * 4) / 5);
+        for (i2 = 0; i2 < 5; i2++) addModeCard(modes[i2], cx - cw / 2, y3 + i2 * (ch + gapV), cw, ch);
       }
-      var dw = u * 0.52, dh = u * 0.085;
-      add(B('duel', cx - dw / 2, H - dh - u * 0.045 - Game.bottomInset(), dw, dh, I18N.t('duel'), function () { Game.openDuel(); }, 'gold', { icon: 'ui_share.png' }));
-      addBack(H);
+      addBack();
       return;
     }
 
@@ -4093,7 +4107,7 @@ if (!window.vkBridge) {
         add(B('vk_lb', W / 2 - vw / 2, H - vh - u * 0.045 - Game.bottomInset(), vw, vh, I18N.t('vk_rating'),
           function () { Game.openVkRating(); }, 'gold'));
       }
-      addBack(H, true);
+      addBack();
       return;
     }
 
@@ -4197,12 +4211,19 @@ if (!window.vkBridge) {
     }
 
     function addModeCard(m, x, y, w, h) {
-      add(B('mode_' + m[0], x, y, w, h, m[1], function () { Game.startRound(m[0]); }, 'card',
-        { tag: m[0], sub: m[2], color: m[3], best: m[4] }));
+      add(B('mode_' + m[0], x, y, w, h, m[1], function () {
+        if (m[0] === 'duel') Game.openDuel(); else Game.startRound(m[0]);
+      }, 'card', { tag: m[0], sub: m[2], subS: m[3], color: m[4], best: m[5] }));
     }
-    function addBack(hh) {
-      var bw2 = u * 0.30, bh2 = u * 0.085;
-      add(B('back', u * 0.035 + Game.sideInset('left'), hh - bh2 - u * 0.028 - Game.bottomInset(), bw2, bh2, I18N.t('back'), function () { Game.toMenu(false); }, 'ghost',
+    function addBack() {
+      /* v6.2.4: «Назад» — компактная стрелка ВВЕРХУ слева на всех экранах.
+         Снизу не остаётся ни кнопок, ни технических надписей: нижняя зона
+         экранов пуста (требование пользователя + п. 3.2.2 Правил VK). */
+      var sz = u * 0.085;
+      var bx = Math.max(8, u * 0.02) + Game.sideInset('left');
+      var by = Math.max(8, u * 0.02) + Game.topInset();
+      UI.backRect = { x: bx, y: by, w: sz, h: sz };
+      add(B('back', bx, by, sz, sz, '', function () { Game.toMenu(false); }, 'icon',
         { icon: 'ui_back.png', list: false }));
     }
   };
@@ -6203,48 +6224,100 @@ if (!window.vkBridge) {
     ctx.fillText('+' + a.coins, b.x + b.w - b.h * 0.2, y + b.h * 0.28);
   };
 
+  /* v6.2.4: карточка режима переработана. Раньше все внутренние отступы
+     считались от ВЫСОТЫ карточки, поэтому в альбомной ориентации (карточка
+     узкая и высокая) заголовок, рекорд и описание уезжали в соседние
+     карточки и перекрывались. Теперь раскладка зависит от пропорции
+     карточки, а каждый текст живёт в своей полосе: пересечения исключены
+     конструктивно (полосы не пересекаются по построению). */
   Game.drawModeCard = function (b, y) {
     var ctx = Game.ctx, u = Game.unit;
     var col = b.color || '#8dffbe';
-    var L = Game.orient === 'landscape';
+    var vert = b.h > b.w * 1.05;   /* высокая карточка (альбом) — вертикальная компоновка */
+    var rad = Math.min(b.w, b.h) * 0.10;
+    var pillTxt = (b.tag === 'duel')
+      ? I18N.t('duel_stats', { w: Store.data.duels.won, l: Store.data.duels.lost })
+      : (I18N.t('best') + ': ' + (b.best || 0));
+    var sprName = b.tag === 'classic' ? 'fruit_watermelon.png'
+      : (b.tag === 'arcade' ? 'special_double.png'
+        : (b.tag === 'duel' ? 'ui_share.png' : 'special_freeze.png'));
+    var img = Assets.get(sprName);
     ctx.save();
     var g = ctx.createLinearGradient(b.x, y, b.x, y + b.h);
     g.addColorStop(0, 'rgba(255,255,255,.13)');
     g.addColorStop(1, 'rgba(255,255,255,.04)');
     ctx.fillStyle = g;
-    U.rr(ctx, b.x, y, b.w, b.h, b.h * 0.14); ctx.fill();
+    U.rr(ctx, b.x, y, b.w, b.h, rad); ctx.fill();
     ctx.lineWidth = Math.max(1.5, u * 0.006);
     ctx.strokeStyle = U.rgba(col, 0.85);
-    U.rr(ctx, b.x, y, b.w, b.h, b.h * 0.14); ctx.stroke();
+    U.rr(ctx, b.x, y, b.w, b.h, rad); ctx.stroke();
     ctx.fillStyle = U.rgba(col, 0.9);
-    U.rr(ctx, b.x, y, Math.max(3, b.w * 0.018), b.h, b.h * 0.14); ctx.fill();
-    var ix = b.x + b.h * 0.34, iy = y + b.h * 0.5, ir = b.h * 0.20;
-    var sprName = b.tag === 'classic' ? 'fruit_watermelon.png' : (b.tag === 'arcade' ? 'special_double.png' : 'special_freeze.png');
-    var img = Assets.get(sprName);
-    if (img) {
-      ctx.save();
-      ctx.translate(ix, iy);
-      ctx.rotate(Math.sin(Game.sessionTime * 1.4 + ix * 0.01) * 0.12);
-      ctx.drawImage(img, -ir, -ir, ir * 2, ir * 2);
-      ctx.restore();
+    U.rr(ctx, b.x, y, Math.max(3, b.w * 0.016), b.h, rad); ctx.fill();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+    if (vert) {
+      /* вертикальные полосы: заголовок → рекорд → икона → описание */
+      var pad = b.w * 0.07;
+      var inW = b.w - pad * 2;
+      var tH = b.h * 0.085;
+      var pH = b.h * 0.062;
+      var desc = b.subS || b.sub;
+      var dH = b.h * 0.060;
+      var top = y + pad;
+      var bot = y + b.h - pad;
+      var iconTop = top + tH + pH + b.h * 0.030;
+      var iconBot = bot - dH - b.h * 0.030;
+      var ir = Math.max(6, Math.min(b.w * 0.28, (iconBot - iconTop) * 0.5));
+      if (img) {
+        ctx.save();
+        ctx.translate(b.x + b.w / 2, (iconTop + iconBot) / 2);
+        ctx.rotate(Math.sin(Game.sessionTime * 1.4 + b.x * 0.01) * 0.12);
+        ctx.drawImage(img, -ir, -ir, ir * 2, ir * 2);
+        ctx.restore();
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.font = U.fitFont(ctx, b.label, tH * 0.92, U.FONT, inW, '900');
+      ctx.fillText(b.label, b.x + b.w / 2, top + tH / 2);
+      ctx.font = U.fitFont(ctx, pillTxt, pH * 0.84, U.FONT, inW * 0.96, '900');
+      var pw = U.tw(ctx, pillTxt, ctx.font) + pH * 0.55;
+      var py = top + tH + pH * 0.12;
+      ctx.fillStyle = 'rgba(0,0,0,.32)';
+      U.rr(ctx, b.x + b.w / 2 - pw / 2, py, pw, pH, pH * 0.5); ctx.fill();
+      ctx.fillStyle = '#ffdf6b';
+      ctx.fillText(pillTxt, b.x + b.w / 2, py + pH / 2);
+      ctx.fillStyle = 'rgba(255,255,255,.78)';
+      ctx.font = U.fitFont(ctx, desc, dH * 0.86, U.FONT, inW, '600');
+      ctx.fillText(desc, b.x + b.w / 2, bot - dH / 2);
+    } else {
+      /* горизонтальная карточка (портрет): икона слева, тексты справа */
+      var pad2 = b.h * 0.10;
+      var ir2 = b.h * 0.27;
+      if (img) {
+        ctx.save();
+        ctx.translate(b.x + b.h * 0.30, y + b.h / 2);
+        ctx.rotate(Math.sin(Game.sessionTime * 1.4 + b.x * 0.01) * 0.12);
+        ctx.drawImage(img, -ir2, -ir2, ir2 * 2, ir2 * 2);
+        ctx.restore();
+      }
+      var tx = b.x + b.h * 0.58;
+      ctx.font = U.fitFont(ctx, pillTxt, b.h * 0.115, U.FONT, b.w * 0.5, '900');
+      var pw2 = U.tw(ctx, pillTxt, ctx.font) + b.h * 0.22;
+      var ph2 = b.h * 0.20;
+      var px2 = b.x + b.w - pw2 - pad2, py2 = y + pad2 * 0.7;
+      ctx.fillStyle = 'rgba(0,0,0,.32)';
+      U.rr(ctx, px2, py2, pw2, ph2, ph2 * 0.5); ctx.fill();
+      ctx.fillStyle = '#ffdf6b';
+      ctx.fillText(pillTxt, px2 + pw2 / 2, py2 + ph2 / 2);
+      /* заголовок: правая граница — строго левее пилюли рекорда */
+      var tMax = Math.max(b.w * 0.30, px2 - tx - b.h * 0.06);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = U.fitFont(ctx, b.label, b.h * 0.17, U.FONT, tMax, '900');
+      ctx.fillText(b.label, tx, y + b.h * 0.30);
+      /* описание: две строки НИЖЕ пилюли, с многоточием при обрезке */
+      Game.wrapTextLeft(b.sub, tx, y + b.h * 0.56, b.x + b.w - pad2 - tx, b.h * 0.16,
+        '600 ' + (b.h * 0.105) + 'px ' + U.FONT, 2);
     }
-    var tx = b.x + b.h * 0.66;
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 ' + (b.h * (L ? 0.20 : 0.17)) + 'px ' + U.FONT;
-    ctx.fillText(b.label, tx, y + b.h * (L ? 0.32 : 0.28), b.w * 0.62);
-    ctx.fillStyle = 'rgba(255,255,255,.72)';
-    ctx.font = '600 ' + (b.h * (L ? 0.115 : 0.105)) + 'px ' + U.FONT;
-    Game.wrapTextLeft(b.sub, tx, y + b.h * (L ? 0.56 : 0.52), b.w * 0.66, b.h * 0.16, ctx.font, 2);
-    var bestTxt = I18N.t('best') + ': ' + (b.best || 0);
-    ctx.font = '900 ' + (b.h * 0.115) + 'px ' + U.FONT;
-    var bw = U.tw(ctx, bestTxt, ctx.font) + b.h * 0.24;
-    var bx = b.x + b.w - bw - b.h * 0.14, byy = y + b.h * 0.14;
-    ctx.fillStyle = 'rgba(0,0,0,.32)';
-    U.rr(ctx, bx, byy, bw, b.h * 0.20, b.h * 0.10); ctx.fill();
-    ctx.fillStyle = '#ffdf6b';
-    ctx.textAlign = 'center';
-    ctx.fillText(bestTxt, bx + bw / 2, byy + b.h * 0.105);
     ctx.restore();
   };
 
@@ -6261,6 +6334,14 @@ if (!window.vkBridge) {
     }
     if (cur) lines.push(cur);
     maxLines = maxLines || 3;
+    /* v6.2.4: при обрезке по числу строк — многоточие и доупор по ширине,
+       чтобы текст не вылезал из своей зоны и не перекрывал соседей */
+    if (lines.length > maxLines) {
+      lines = lines.slice(0, maxLines);
+      var lastL = lines[maxLines - 1] + '…';
+      while (U.tw(ctx, lastL, font) > maxW && lastL.length > 2) lastL = lastL.slice(0, -2) + '…';
+      lines[maxLines - 1] = lastL;
+    }
     for (var j = 0; j < Math.min(maxLines, lines.length); j++) ctx.fillText(lines[j], x, y + j * lh);
   };
 
@@ -6324,13 +6405,13 @@ if (!window.vkBridge) {
     ctx.restore();
   };
 
-  Game.drawLevelBar = function () {
+  Game.drawLevelBar = function (dx) {
     var ctx = Game.ctx, u = Game.unit;
     var st = Store.data.stats;
     var lvl = st.level || 1, xp = st.xp || 0, need = FS.Levels.need(lvl);
     var pad = Math.max(10, u * 0.03);
     var w = u * 0.34, h = u * 0.062;
-    var x = pad, y = Math.max(10, u * 0.03);
+    var x = pad + (dx || 0), y = Math.max(10, u * 0.03);
     ctx.save();
     ctx.fillStyle = 'rgba(10,6,24,.5)';
     U.rr(ctx, x, y, w, h, h * 0.4); ctx.fill();
@@ -6358,17 +6439,32 @@ if (!window.vkBridge) {
     ctx.restore();
   };
 
-  Game.drawCoins = function () {
+  /* v6.2.4: геометрия пилюли монет отдельной функцией — заголовок экрана
+     вписывается МЕЖДУ стрелкой «Назад» и пилюлей, поэтому пересечение
+     текстов исключено конструктивно (см. Game.drawHeader). */
+  Game.coinRect = function () {
     var ctx = Game.ctx, u = Game.unit;
     var s = u * 0.05;
-    var txt = String(Store.data.coins);
     ctx.save();
     ctx.font = '900 ' + (s * 0.92) + 'px ' + U.FONT;
-    var w = ctx.measureText(txt).width;
-    var x = Game.W - Math.max(10, u * 0.03) - w - s * 1.5;
-    var y = Math.max(10, u * 0.03) + Game.topInset();
+    var w = ctx.measureText(String(Store.data.coins)).width;
+    ctx.restore();
+    return {
+      x: Game.W - Math.max(10, u * 0.03) - w - s * 1.5,
+      y: Math.max(10, u * 0.03) + Game.topInset(),
+      w: w + s * 1.5, h: s * 1.3, s: s
+    };
+  };
+
+  Game.drawCoins = function () {
+    var ctx = Game.ctx, u = Game.unit;
+    var r = Game.coinRect(), s = r.s;
+    var txt = String(Store.data.coins);
+    var x = r.x, y = r.y, w = r.w;
+    ctx.save();
+    ctx.font = '900 ' + (s * 0.92) + 'px ' + U.FONT;
     ctx.fillStyle = 'rgba(10,6,24,.5)';
-    U.rr(ctx, x, y, w + s * 1.5, s * 1.3, s * 0.65); ctx.fill();
+    U.rr(ctx, x, y, w, s * 1.3, s * 0.65); ctx.fill();
     ctx.save();
     ctx.translate(x + s * 0.72, y + s * 0.66);
     ctx.rotate(Math.sin(Game.sessionTime * 2.2) * 0.15);
@@ -6406,7 +6502,7 @@ if (!window.vkBridge) {
 
     if (s === 'menu') {
       Game.drawCoins();
-      Game.drawLevelBar();
+      Game.drawLevelBar(u * 0.12);   /* v6.2.4: слева от полосы — значок звука */
       var tiM = Game.topInset(), biM = Game.bottomInset();
       var HcM = Math.max(H * 0.55, H - biM - tiM);
       var ucM = u * U.clamp(HcM / H, 0.62, 1);
@@ -6418,7 +6514,9 @@ if (!window.vkBridge) {
       ctx.fillText(I18N.t('first_launch_tip'), W / 2, tiM + HcM * (L ? 0.26 : 0.235), W * 0.9);
       ctx.restore();
       Game.drawBestRow(tiM + HcM * (L ? 0.76 : 0.80));
-      Game.drawFooter();
+      /* v6.2.4: футера с версией/облаком больше нет — технические надписи
+         живут только в настройках; возрастная категория — при первом запуске
+         (п. 2.1.5) и в настройках */
     } else if (s === 'modes') {
       Game.drawCoins();
       Game.drawHeader(I18N.t('modes_title'));
@@ -6484,20 +6582,10 @@ if (!window.vkBridge) {
     ctx.restore();
   };
 
-  // Узкие экраны (W < ~680): если центрированный заголовок упирается в пилюлю
-  // монет справа — опускаем заголовок ниже строки монет (v6.1.1, VK 600×1200).
+  /* v6.2.4: заголовок вписывается по горизонтали между «Назад» и монетами
+     (Game.drawHeader), поэтому вертикальный сдвиг больше не нужен. */
   Game.headerShift = function (title) {
-    var ctx = Game.ctx, u = Game.unit, W = Game.W;
-    if (!title || Game.orient === 'landscape') return false;
-    ctx.save();
-    ctx.font = U.fitFont(ctx, title, u * 0.062, U.FONT, W * 0.68, '900');
-    var tw = ctx.measureText(title).width;
-    var s = u * 0.05;
-    ctx.font = '900 ' + (s * 0.92) + 'px ' + U.FONT;
-    var cw = ctx.measureText(String(Store.data.coins)).width;
-    ctx.restore();
-    var pillX = W - Math.max(10, u * 0.03) - cw - s * 1.5;
-    return (W / 2 + tw / 2) > pillX - u * 0.02;
+    return false;
   };
 
   Game.headShiftFor = function (s) {
@@ -6515,20 +6603,29 @@ if (!window.vkBridge) {
   };
 
   Game.drawHeader = function (title, sub) {
-    var ctx = Game.ctx, u = Game.unit;
-    var dy = Game.headerShift(title) ? u * 0.06 : 0;
+    /* v6.2.4: заголовок центрируется в свободной полосе МЕЖДУ стрелкой
+       «Назад» слева и пилюлей монет справа — пересечение текстов исключено
+       конструктивно на любой ширине экрана. */
+    var ctx = Game.ctx, u = Game.unit, W = Game.W;
+    var gap = Math.max(8, u * 0.02);
+    var left = gap;
+    if (UI.backRect) left = UI.backRect.x + UI.backRect.w + gap * 0.75;
+    var right = Game.coinRect().x - gap * 0.75;
+    if (right - left < W * 0.34) { left = gap; right = W - gap; }
+    var cxh = (left + right) / 2;
+    var maxW = (right - left) * 0.98;
     ctx.save();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = U.fitFont(ctx, title, u * 0.062, U.FONT, Game.W * 0.68, '900');
+    ctx.font = U.fitFont(ctx, title, u * 0.062, U.FONT, maxW, '900');
     ctx.lineJoin = 'round';
     ctx.lineWidth = u * 0.012; ctx.strokeStyle = 'rgba(30,8,50,.7)';
-    ctx.strokeText(title, Game.W / 2, u * 0.075 + dy + Game.topInset());
+    ctx.strokeText(title, cxh, u * 0.075 + Game.topInset());
     ctx.fillStyle = '#fff';
-    ctx.fillText(title, Game.W / 2, u * 0.075 + dy + Game.topInset());
+    ctx.fillText(title, cxh, u * 0.075 + Game.topInset());
     if (sub) {
       ctx.font = '700 ' + (u * 0.026) + 'px ' + U.FONT;
       ctx.fillStyle = 'rgba(255,255,255,.75)';
-      ctx.fillText(sub, Game.W / 2, u * 0.125 + dy + Game.topInset(), Game.W * 0.94);
+      ctx.fillText(sub, cxh, u * 0.125 + Game.topInset(), maxW);
     }
     ctx.restore();
   };
@@ -6547,22 +6644,11 @@ if (!window.vkBridge) {
     ctx.restore();
   };
 
-  /* Подвал меню: версия, облачные сохранения и ВОЗРАСТНАЯ КАТЕГОРИЯ.
-     п. 2.1.5 Правил VK — информация о возрастных ограничениях видна
-     пользователю (при первом запуске она дополнительно показывается в
-     окне согласия). п. 4.2.6 — никаких упоминаний сторонних площадок. */
-  Game.drawFooter = function () {
-    var ctx = Game.ctx, u = Game.unit;
-    ctx.save();
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    var ftxt = I18N.t('set_credits', { v: CFG.version }) + '  •  ' + CFG.ageRating +
-      '  •  ' + I18N.t('set_cloud') + ': ' +
-      ((Game.platform && Game.platform.cloud) ? I18N.t('set_cloud_on') : I18N.t('set_cloud_off'));
-    ctx.font = U.fitFont(ctx, ftxt, u * 0.022, U.FONT, Game.W * 0.94, '600');
-    ctx.fillStyle = 'rgba(255,255,255,.45)';
-    ctx.fillText(ftxt, Game.W / 2, Game.H - u * 0.026 - Game.bottomInset());
-    ctx.restore();
-  };
+  /* v6.2.4: подвал с техническими надписями (версия, облачные сохранения)
+     УДАЛЁН по требованию пользователя: на экранах не остаётся служебного
+     текста. Версия и состояние облака выводятся только в настройках
+     (строка set_info), возрастная категория — при первом запуске (п. 2.1.5)
+     и в настройках (строка age). */
 
   Game.drawBestRow = function (y) {
     var ctx = Game.ctx, u = Game.unit;
