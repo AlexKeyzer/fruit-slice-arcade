@@ -877,7 +877,10 @@ if (!window.vkBridge) {
     opts = opts || {};
     this.name = 'local';
     this.cloud = false;
-    this.adsAvailable = opts.ads !== false;
+    /* v6.5.1: вне VK (прямой заход на хост) реклама НЕ симулируется:
+       кнопки rewarded/interstitial скрыты, награды без просмотра исключены.
+       Для отладки: FS.Platform.create({ local: { ads: true } }) */
+    this.adsAvailable = opts.ads === true;
     this.ready_ = false;
     this.gameplay = false;
     this.started = false;
@@ -1509,7 +1512,7 @@ if (!window.vkBridge) {
   /* ===================== ЧАСТЬ A: КОНФИГ, УТИЛИТЫ, АССЕТЫ, ЗВУК ======== */
 
   var CFG = {
-    version: '6.5.0',
+    version: '6.5.1',
     saveKey: 'fs_save_v1',
     schema: 3,
     /* Зазор между липким баннером и элементами интерфейса, px (п. 5.1.4.2г) */
@@ -4715,8 +4718,10 @@ if (!window.vkBridge) {
         gy += gh * 1.18;
       }
       if (go.canDouble && Game.adsAvailable('rewarded')) {
-        /* A1 v6.3: удвоение начисляет и очки, и монеты (подпись double_coins) */
-        add(B('double', gx, gy, gw, gh, I18N.t('double_coins'), function () { Game.rewardDouble(); }, 'gold', { icon: 'ui_ad.png' }));
+        /* A1 v6.3: удвоение начисляет и очки, и монеты (подпись double_coins).
+           v6.5.1: точный размер награды прямо на кнопке (прозрачность, п. 5) */
+        add(B('double', gx, gy, gw, gh, I18N.t('double_coins') + '  +' + (go.coins || 0) + ' ⬤',
+          function () { Game.rewardDouble(); }, 'gold', { icon: 'ui_ad.png' }));
         gy += gh * 1.18;
       }
       if (zenRow) {
@@ -8240,6 +8245,7 @@ if (!window.vkBridge) {
 
     var ts0 = U.now();
     if (!Game.paused) Game.step(dt);
+    Game.syncBanner();   /* v6.5.1: баннер только вне геймплея */
     var ts1 = U.now();
     pf.physMs = ts1 - ts0;
     pf.physSum += pf.physMs; pf.physN++;
@@ -8359,7 +8365,10 @@ if (!window.vkBridge) {
     pl.on('language', function (l) { if (l) Game.setLang(l, false); });
     pl.on('orientation', function () { Game.resize(); });
     pl.on('banner', function (h) {
-      Game.stickyInset = Math.max(0, h | 0);
+      /* v6.5.1: зона резервируется ОДИН раз и не освобождается при скрытии
+         баннера на геймплее (п. 5.1.4.2(б): баннер не должен появляться там,
+         где пользователь ранее нажимал; раскладка не «прыгает») */
+      if ((h | 0) > 0) Game.stickyInset = Math.max(Game.stickyInset, h | 0);
       Game.resize();
     });
     /* п. 3.2.2: безопасные зоны от платформы (VKWebAppViewportOffsetChanged) */
@@ -8535,6 +8544,27 @@ if (!window.vkBridge) {
      (обучение) и оказался в главном меню. Вызывается из layoutScreen().
      п. 5.1.4.2(а) — не на онбординге; п. 5.1.4.1(б) — баннер снизу, игровая
      зона уменьшается на его высоту (Game.bottomInset → Game.inset). */
+  /* ===== v6.5.1 PATCH: баннер ЖИВЁТ только вне геймплея =====
+     п. 5.1.4.2(г): активная область баннера не может находиться ближе
+     100 px к функциональной области, требующей активных частых нажатий,
+     а игровой свайп-зонa — именно такая. Поэтому на playing/paused/
+     tutorial/replay/confirm/загрузках баннер скрывается (VKWebAppHideBannerAd),
+     а на меню/списках/итогах — показывается обратно. Зона баннера при этом
+     ЗАРЕЗЕРВИРОВАНА всегда (stickyInset не освобождается), чтобы баннер
+     никогда не появлялся там, где пользователь раньше нажимал
+     (п. 5.1.4.2(б)). */
+  Game.syncBanner = function () {
+    var pl = Game.platform;
+    if (!pl || pl.name !== 'vk' || !pl.showBanner || !pl.hideBanner) return;
+    if (!Game._bannerRequested || !Game.consentOK || !Store.data.tutorial_done) return;
+    var hiddenScreens = { playing: 1, paused: 1, tutorial: 1, replay: 1, confirm: 1, loading: 1, boot: 1 };
+    var want = !hiddenScreens[Game.screen];
+    if (want === Game._bannerOn) return;
+    Game._bannerOn = want;
+    try { if (want) pl.showBanner(); else pl.hideBanner(); } catch (e) { }
+    Game.logMsg('banner:' + (want ? 'show' : 'hide') + ':' + Game.screen);
+  };
+
   Game.maybeShowBanner = function () {
     if (Game._bannerRequested) return;
     /* v6.4: баннер показывается не только в меню, но и на неигровых экранах
@@ -8545,7 +8575,8 @@ if (!window.vkBridge) {
     var pl = Game.platform;
     if (!pl || pl.name !== 'vk' || !pl.showBanner) return;
     Game._bannerRequested = true;
-    Game.stickyInset = pl.bannerHeight || 96;
+    Game._bannerOn = true;
+    Game.stickyInset = Math.max(Game.stickyInset, pl.bannerHeight || 96);
     Game.resize();
     try { pl.showBanner(); } catch (e) { }
     Game.logMsg('banner:shown-after-onboarding');
