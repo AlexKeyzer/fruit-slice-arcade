@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -358,6 +359,30 @@ if (!window.vkBridge) {
       th_sakura: 'Сакура',
       theme_buy_q: 'Купить тему «{name}» за {cost} монет?',
       theme_bought: 'Тема «{name}» куплена!',
+      /* ===== v6.4 PATCH: новые ключи ru (рост + монетизация) ===== */
+      wheel_title: 'Колесо фортуны',
+      wheel_btn: 'Колесо',
+      wheel_hint: 'Бесплатный спин — раз в день',
+      wheel_free: 'БЕСПЛАТНЫЙ СПИН',
+      wheel_ad: '🎬 ЕЩЁ СПИН',
+      wheel_left: 'Спинов за рекламу сегодня: {n}',
+      wheel_tomorrow: 'Возвращайся завтра за бесплатным спином!',
+      wheel_win: '+{n} монет!',
+      wheel_premium: 'Премиум-лезвие на 24 часа!',
+      invite_friend: 'Пригласить друга',
+      invite_ok: 'Приглашение отправлено!',
+      invite_fail: 'Не удалось отправить приглашение',
+      to_story: '📷 В историю',
+      fav_prompt: '★ В избранное — чтобы не потерять игру',
+      fav_ok: 'Игра добавлена в избранное!',
+      time_ext_15: '+15 СЕКУНД',
+      daily_x2: '🎬 ×2',
+      quest_x2: '🎬 ×2',
+      quest_x2_left: 'Удвоений наград сегодня: {n}',
+      duel_from_link: 'Друг вызвал тебя на дуэль!',
+      community: 'Сообщество игры',
+      community_join: 'Спасибо за подписку!',
+      share_link_line: 'Играть: {link}',
       theme_on: 'Тема: {name}'
       /* Названия сторонних площадок из сборки удалены (п. 4.2.6 Правил VK):
          в интерфейсе игры не должно быть упоминаний платформ, отличных от VK. */
@@ -401,6 +426,29 @@ if (!window.vkBridge) {
       th_sakura: 'Sakura',
       theme_buy_q: 'Buy theme "{name}" for {cost} coins?',
       theme_bought: 'Theme "{name}" purchased!',
+      wheel_title: 'Lucky Wheel',
+      wheel_btn: 'Wheel',
+      wheel_hint: 'One free spin a day',
+      wheel_free: 'FREE SPIN',
+      wheel_ad: '🎬 EXTRA SPIN',
+      wheel_left: 'Ad spins left today: {n}',
+      wheel_tomorrow: 'Come back tomorrow for a free spin!',
+      wheel_win: '+{n} coins!',
+      wheel_premium: 'Premium blade for 24h!',
+      invite_friend: 'Invite a friend',
+      invite_ok: 'Invite sent!',
+      invite_fail: 'Could not send invite',
+      to_story: '📷 To story',
+      fav_prompt: '★ Add to favorites',
+      fav_ok: 'Added to favorites!',
+      time_ext_15: '+15 SECONDS',
+      daily_x2: '🎬 ×2',
+      quest_x2: '🎬 ×2',
+      quest_x2_left: 'Reward doubles left today: {n}',
+      duel_from_link: 'A friend challenged you!',
+      community: 'Game community',
+      community_join: 'Thanks for subscribing!',
+      share_link_line: 'Play: {link}',
       theme_on: 'Theme: {name}'
     }
 };
@@ -959,6 +1007,13 @@ if (!window.vkBridge) {
     return Promise.resolve({ rank: b.length, score: me });
   };
 
+  /* v6.4 PATCH: локальные заглушки новых платформенных методов */
+  LocalAdapter.prototype.getAppId = function () { return null; };
+  LocalAdapter.prototype.appLink = function () { return null; };
+  LocalAdapter.prototype.invite = function () { return Promise.resolve(false); };
+  LocalAdapter.prototype.story = function () { return Promise.resolve(false); };
+  LocalAdapter.prototype.joinGroup = function () { return Promise.resolve(false); };
+  LocalAdapter.prototype.allowGroupMsgs = function () { return Promise.resolve(false); };
   LocalAdapter.prototype.setMuted = function () { return false; };
   LocalAdapter.prototype.isAdblock = function () { return Promise.resolve(false); };
   LocalAdapter.prototype.destroy = function () { this._h = {}; };
@@ -1224,6 +1279,58 @@ if (!window.vkBridge) {
       ['catch'](function () { return false; });
   };
 
+  /* --------------------- v6.4 PATCH: рост/виральность --------------------
+     appLink — ВНУТРЕННЯЯ ссылка VK на это же приложение (п. 4.1.8 Правил
+     запрещает уводить на сторонние ресурсы; vk.com/app{ID} — ссылка на
+     эту же платформу, поэтому допустима).
+     invite — нативный диалог приглашения друзей (VKWebAppShowInviteBox).
+     story — публикация картинки в историю (VKWebAppShowStoryBox).
+     joinGroup/allowGroupMsgs — сообщество игры как канал возврата.
+     Награды за соц. действия НЕ выдаются (п. 2.6.2 Правил). */
+  VkAdapter.prototype.getAppId = function () {
+    var id = this.launch && (this.launch.vk_app_id || this.launch.app_id);
+    if (!id) {
+      try {
+        var loc = location.search + '&' + location.hash;
+        var m = /[?&#]vk_app_id=(\d+)/.exec(loc);
+        if (m) id = m[1];
+      } catch (e) { }
+    }
+    return id ? String(id) : null;
+  };
+  VkAdapter.prototype.appLink = function (hash) {
+    var id = this.getAppId();
+    if (!id) return null;
+    return 'https://vk.com/app' + id + (hash ? '#' + hash : '');
+  };
+  VkAdapter.prototype.invite = function () {
+    var self = this;
+    return this._send('VKWebAppShowInviteBox', {})
+      .then(function () { self.log.push('invite:ok'); return true; })
+      ['catch'](function () { self.log.push('invite:fail'); return false; });
+  };
+  VkAdapter.prototype.story = function (dataUrl) {
+    var self = this;
+    var b64 = String(dataUrl || '');
+    var i = b64.indexOf('base64,');
+    if (i >= 0) b64 = b64.slice(i + 7);
+    if (!b64) return Promise.resolve(false);
+    return this._send('VKWebAppShowStoryBox', { blobs: [b64] })
+      .then(function () { self.log.push('story:ok'); return true; })
+      ['catch'](function () { self.log.push('story:fail'); return false; });
+  };
+  VkAdapter.prototype.joinGroup = function (gid) {
+    var self = this;
+    return this._send('VKWebAppJoinGroup', { group_id: gid | 0 })
+      .then(function () { self.log.push('joinGroup:ok'); return true; })
+      ['catch'](function () { return false; });
+  };
+  VkAdapter.prototype.allowGroupMsgs = function (gid) {
+    return this._send('VKWebAppAllowMessagesFromGroup', { group_id: gid | 0 })
+      .then(function () { return true; })
+      ['catch'](function () { return false; });
+  };
+
   /* ------------------------------- сейвы ------------------------------ */
   VkAdapter.prototype.save = function (data) {
     var self = this;
@@ -1367,7 +1474,7 @@ if (!window.vkBridge) {
   /* ===================== ЧАСТЬ A: КОНФИГ, УТИЛИТЫ, АССЕТЫ, ЗВУК ======== */
 
   var CFG = {
-    version: '6.3.0',
+    version: '6.4.0',
     saveKey: 'fs_save_v1',
     schema: 3,
     /* Зазор между липким баннером и элементами интерфейса, px (п. 5.1.4.2г) */
@@ -1432,6 +1539,13 @@ if (!window.vkBridge) {
     interstitialMinPlay: 120,
     maxInterstitialPerSession: 6,
     rewardedShield: 60,       /* A4 v6.3: не показывать interstitial < 60с после rewarded */
+
+    /* ===== v6.4 PATCH: настройки новых механик (пороги интерстишелов НЕ тронуты) ===== */
+    timeExtArcade: 15,        /* «+15 сек» за rewarded в Аркаде/Дейлике, 1 раз за раунд */
+    wheelAdSpinsPerDay: 2,    /* доп. спины колеса за рекламу в день */
+    questDoublesPerDay: 3,    /* сколько наград заданий можно удвоить за рекламу в день */
+    vkGroupId: 0,             /* ID сообщества игры; 0 = строка в настройках скрыта */
+    mailCounterId: 0,         /* ID счётчика Top.Mail; 0 = внешняя аналитика выключена */
 
     physBudgetMs: 5
   };
@@ -1986,7 +2100,11 @@ if (!window.vkBridge) {
       premium_until: 0,
       blade_trial: null,
       /* E1 v6.3: косметические темы фона (покупка за монеты, коллекция) */
-      themes: { owned: ['default'], equipped: 'default' }
+      themes: { owned: ['default'], equipped: 'default' },
+      /* ===== v6.4 PATCH: состояние новых механик; mergeDef подхватит у старых сейвов ===== */
+      wheel: { lastFree: '', adDate: '', adUsed: 0, spins: 0, wins: 0 },
+      daily2x: { date: '' },
+      quest2x: { date: '', used: 0 }
     };
   }
 
@@ -2362,6 +2480,7 @@ if (!window.vkBridge) {
         var reward = 50 + st.level * 10;
         Store.addCoins(reward);
         Game.toast(I18N.t('levelup', { n: st.level }), '+' + reward + ' ⬤', '#8dffbe');
+        if (FS.Analytics) FS.Analytics.ev('level_up', { level: st.level });
         Snd.play('levelup');
         Game.confetti(Game.W / 2, Game.H * 0.3, 26, ['#8dffbe', '#ffd84d', '#7fd8ff', '#ff5a6e']);
         Game.pulse = 1;
@@ -2453,6 +2572,125 @@ if (!window.vkBridge) {
     { id: 'forest',  cost: 500, tint: '#5cff9d' },
     { id: 'sakura',  cost: 600, tint: '#ffb7d5' }
   ];
+
+  /* ============ v6.4 PATCH: АНАЛИТИКА (по умолчанию выключена) ===========
+     FS.Analytics.ev(name, data) — единая точка событий. Последние 200
+     событий хранятся в памяти (доступны через FS.Analytics.dump() для
+     отладки). Если CFG.mailCounterId > 0, после первого раунда лениво
+     подключается счётчик Top.Mail (VK Analytics) и события уходят в него
+     как reachGoal. Внешних запросов по умолчанию НЕТ — счётчик выключен. */
+  var Analytics = {
+    events: [],
+    max: 200,
+    _tmrReady: false,
+    ev: function (name, data) {
+      try {
+        Analytics.events.push({ n: name, d: data || null, t: Date.now() });
+        if (Analytics.events.length > Analytics.max) Analytics.events.shift();
+        Analytics._push(name, data);
+      } catch (err) { }
+    },
+    ensureCounter: function () {
+      if (Analytics._tmrReady || !CFG.mailCounterId) return;
+      Analytics._tmrReady = true;
+      try {
+        window._tmr = window._tmr || [];
+        window._tmr.push({ id: String(CFG.mailCounterId), type: 'pageView', start: (new Date()).getTime() });
+        if (!document.getElementById('fs_tmr_counter')) {
+          var ts = document.createElement('script');
+          ts.type = 'text/javascript'; ts.async = true; ts.id = 'fs_tmr_counter';
+          ts.src = 'https://top-fw.ru1.mail.ru/tracking/js/counter.js';
+          var f = function () { };
+          ts.onload = f; ts.onerror = f;
+          (document.head || document.body || document.documentElement).appendChild(ts);
+        }
+      } catch (e) { }
+    },
+    _push: function (name, data) {
+      if (!CFG.mailCounterId || !Analytics._tmrReady || !window._tmr) return;
+      try {
+        window._tmr.push({ id: String(CFG.mailCounterId), type: 'reachGoal', goal: 'igra_' + name, params: data || undefined });
+      } catch (e) { }
+    },
+    dump: function () { return Analytics.events.slice(); }
+  };
+  FS.Analytics = Analytics;
+
+  /* ============ v6.4 PATCH: КОЛЕСО ФОРТУНЫ (retention + rewarded) ========
+     Один бесплатный спин в сутки + до CFG.wheelAdSpinsPerDay спинов за
+     рекламу. Награды — монеты и премиум-лезвие на сутки. Это ДОПОЛНИТЕЛЬНЫЙ
+     источник ценностей: основной путь — геймплей (п. 5.1.5.2е Правил VK),
+     награда за просмотр обозначена явно (п. 5.1.5.1б). */
+  var WHEEL_SEG = [
+    { coins: 50,  c: '#ff5a6e' },
+    { coins: 100, c: '#ffbe24' },
+    { coins: 75,  c: '#5cff9d' },
+    { coins: 150, c: '#37f6ff' },
+    { coins: 50,  c: '#a05cff' },
+    { premium: 1, c: '#ff9d2e' },
+    { coins: 200, c: '#ff7ab8' },
+    { coins: 300, c: '#8dffbe' }
+  ];
+  var Wheel = {
+    seg: WHEEL_SEG,
+    today: function () { return Daily.today(); },
+    adLeft: function () {
+      var w = Store.data.wheel;
+      if (w.adDate !== Wheel.today()) { w.adDate = Wheel.today(); w.adUsed = 0; }
+      return Math.max(0, CFG.wheelAdSpinsPerDay - (w.adUsed || 0));
+    },
+    canFree: function () { return Store.data.wheel.lastFree !== Wheel.today(); },
+    spin: function (viaAd) {
+      if (Game.wheelAnim) return;
+      if (viaAd) {
+        if (Wheel.adLeft() <= 0) { Snd.play('back'); return; }
+        Game.showRewarded(function () { Wheel._doSpin(true); }, null, 'wheel');
+        return;
+      }
+      if (!Wheel.canFree()) { Snd.play('back'); return; }
+      Wheel._doSpin(false);
+    },
+    _doSpin: function (viaAd) {
+      var idx = Math.floor(Game.rng() * WHEEL_SEG.length) % WHEEL_SEG.length;
+      var segA = U.TAU / WHEEL_SEG.length;
+      /* целевой угол: центр сегмента idx — под указателем сверху, + 4 оборота */
+      var target = -Math.PI / 2 - (idx * segA + segA / 2);
+      var from = Game.wheelAngle || 0;
+      var to = from + 4 * U.TAU + (((target - from) % U.TAU) + U.TAU) % U.TAU;
+      Game.wheelAnim = { t0: Game.nowMs, dur: 3200, from: from, to: to, idx: idx, viaAd: viaAd, awarded: false };
+      var w = Store.data.wheel;
+      if (viaAd) { w.adDate = Wheel.today(); w.adUsed = (w.adUsed || 0) + 1; }
+      else { w.lastFree = Wheel.today(); }
+      w.spins = (w.spins || 0) + 1;
+      Store.save();
+      Snd.play('start');
+      Game.logMsg('wheel-spin:' + (viaAd ? 'ad' : 'free') + ':' + idx);
+      Game.layoutScreen();
+    },
+    finish: function () {
+      var a = Game.wheelAnim;
+      if (!a || a.awarded) return;
+      a.awarded = true;
+      Game.wheelAngle = a.to % U.TAU;
+      Game.wheelAnim = null;
+      var segm = WHEEL_SEG[a.idx];
+      var w = Store.data.wheel;
+      if (segm.premium) {
+        Blades.premiumDay();
+        Game.toast(I18N.t('wheel_title'), I18N.t('wheel_premium'), '#ffdf6b');
+      } else {
+        Store.addCoins(segm.coins);
+        Game.toast(I18N.t('wheel_title'), I18N.t('wheel_win', { n: segm.coins }), '#ffdf6b');
+      }
+      w.wins = (w.wins || 0) + 1;
+      Store.flush();
+      Snd.play('coin');
+      Game.confetti(Game.W / 2, Game.H * 0.42, 26, ['#ffd84d', '#8dffbe', '#7fd8ff', '#ff5a6e']);
+      if (FS.Analytics) FS.Analytics.ev('wheel_spin', { kind: a.viaAd ? 'ad' : 'free', prize: segm.premium ? 'premium' : segm.coins });
+      Game.layoutScreen();
+    }
+  };
+  FS.Wheel = Wheel;
 
   FS.Store = Store;
   FS.Blades = Blades;
@@ -3337,6 +3575,7 @@ if (!window.vkBridge) {
     Game.pulse = 0; Game.hitstop = 0; Game.scorePop = 0; Game.goAnim = 0;
     Game.continuesUsed = 0; Game.doubled = false; Game.combo5Coins = 0; Game.roundCoins = 0;
     Game.zenExtUsed = false;   /* A3 v6.3: сброс «+30 сек» за раунд */
+    Game.timeExtUsed = false;  /* v6.4: сброс «+15 сек» (аркада/дейлик) за раунд */
     Game.acc = 0; Game._acc = 0; Game.roundG = 0;
     if (opt.seed !== undefined && opt.seed !== null) {
       Game.roundSeed = opt.seed >>> 0;
@@ -3370,6 +3609,7 @@ if (!window.vkBridge) {
     Snd.play('start');
     Game.applyMusic();
     Game.logMsg('round-start:' + mode);
+    if (FS.Analytics) { FS.Analytics.ensureCounter(); FS.Analytics.ev('round_start', { mode: mode }); }
     return Game.round;
   };
 
@@ -3461,10 +3701,13 @@ if (!window.vkBridge) {
       time: r.t || 0, doubled: false, xp: xpGain, rank: Game.lbRank || null,
       coinsDoubled: false,          /* A1 v6.3: ×2 монеты — один раз за раунд */
       zenExt: Game.zenExtUsed,      /* A3 v6.3: «+30 сек» уже использовано */
+      timeExt: Game.timeExtUsed,    /* v6.4: «+15 сек» уже использовано */
       hook: hookReward,             /* B2 v6.3 */
       shareOffer: shareOffer        /* C1 v6.3 */
     };
     Levels.add(xpGain);
+    /* v6.4: ключевое событие для воронки — исход раунда */
+    if (FS.Analytics) FS.Analytics.ev('round_end', { mode: mode, score: Game.score, coins: Game.roundCoins, record: isRecord });
     if (shareOffer) Game.toast(I18N.t('new_record'), I18N.t('share_rec_toast'), '#ffd84d');
     /* отправка результата в лидерборд площадки */
     if (Game.platform && Game.platform.lbSubmit) {
@@ -3633,6 +3876,7 @@ if (!window.vkBridge) {
       if (ok) Game.adGate.shown++;
       Game.setPaused(false, 'ad');
       Game.logMsg('interstitial:' + reason + ':' + (ok ? 'ok' : 'fail') + ':' + Game.perf.adDelay.toFixed(2) + 's');
+      if (FS.Analytics) FS.Analytics.ev(ok ? 'ad_ok' : 'ad_fail', { kind: 'interstitial', place: reason });
       if (cb) cb(ok);
     }
     try {
@@ -3658,6 +3902,7 @@ if (!window.vkBridge) {
       if (ok) Game.adGate.lastReward = Game.sessionTime;
       Game.setPaused(false, 'ad');
       Game.logMsg('rewarded:' + (reason || '') + ':' + (ok ? 'ok' : 'fail'));
+      if (FS.Analytics) FS.Analytics.ev(ok ? 'ad_ok' : 'ad_fail', { kind: 'rewarded', place: reason || '' });
       if (cb) cb(ok);
     }
     try {
@@ -3701,6 +3946,9 @@ if (!window.vkBridge) {
     Game.fade = 1; Game.fadeDir = -1;
     Game.toast(I18N.t('tut_done'), '', '#b9ffcf');
     Game.logMsg('tutorial-done');
+    if (FS.Analytics) FS.Analytics.ev('tutorial_done');
+    /* v6.4 PATCH: после обучения — обработать deep-link дуэли, если есть */
+    Game.consumePendingDuel();
   };
 
   Game.tutSkip = function () {
@@ -4174,17 +4422,17 @@ if (!window.vkBridge) {
       var bw = Math.min(W * 0.72, uc * 0.95), bh = uc * (L ? 0.115 : 0.125);
       var y = ti0 + (L ? Hc * 0.30 : Hc * 0.40);
       add(B('play', cx - bw / 2, y, bw, bh, I18N.t('btn_play'), function () { Game.openModes(); }, 'primary', { icon: 'ui_play.png' }));
-      var iw = uc * (L ? 0.100 : 0.112), gap = iw * (L ? 0.22 : 0.20);
+      var iw = uc * (L ? 0.092 : 0.100), gap = iw * (L ? 0.16 : 0.15);
       var row = y + bh + (L ? Hc * 0.038 : Hc * 0.045);
-      var total = iw * 6 + gap * 5;
+      var total = iw * 7 + gap * 6;   /* v6.4: 7 иконок (добавлено «Колесо фортуны») */
       /* п. 3.2.1/3.2.2: ряд иконок не вылезает за экран и под боковые вырезы.
          п. 3.3.2: кнопки на комфортном расстоянии, а подписи — в одну строку,
          поэтому при наличии места раздвигаем ряд и отдаём подписям всю ячейку. */
       var sideMax = Math.max(Game.sideInset('left'), Game.sideInset('right'));
       var avail = W - sideMax * 2 - u * 0.02;
       var want = Math.min(avail * (L ? 0.90 : 0.96), u * (L ? 1.75 : 3.0));
-      if (total < want) { total = want; gap = (total - iw * 6) / 5; }
-      if (total > avail) { gap = Math.max(u * 0.012, (avail - iw * 6) / 5); total = iw * 6 + gap * 5; }
+      if (total < want) { total = want; gap = (total - iw * 7) / 6; }
+      if (total > avail) { gap = Math.max(u * 0.012, (avail - iw * 7) / 6); total = iw * 7 + gap * 6; }
       var cellW = iw + gap * 0.94;      /* ширина, доступная подписи (одна строка) */
       var x0 = cx - total / 2;
       var defs = [
@@ -4192,6 +4440,8 @@ if (!window.vkBridge) {
         ['shop', 'ui_shop.png', I18N.t('btn_blades'), function () { Game.openShop(); }, ''],
         ['ach', 'ui_achieve.png', I18N.t('btn_achieve'), function () { Game.openAch(); }, I18N.t('btn_achieve_s')],
         ['quests', 'ui_quest.png', I18N.t('quest_title'), function () { Game.openQuests(); }, I18N.t('quest_title_s')],
+        /* v6.4: колесо фортуны — 7-я иконка */
+        ['wheel', 'ui_star.png', I18N.t('wheel_btn'), function () { Game.openWheel(); }, ''],
         ['rating', 'ui_cup.png', I18N.t('rating'), function () { Game.openRating(); }, ''],
         ['set', 'ui_settings.png', I18N.t('btn_settings'), function () { Game.openSettings(); }, '']
       ];
@@ -4199,11 +4449,18 @@ if (!window.vkBridge) {
         add(B(defs[i][0], x0 + i * (iw + gap), row, iw, iw, '', defs[i][3], 'icon',
           { icon: defs[i][1], sub: Game.pickLabel(defs[i][2], defs[i][4], cellW), subW: cellW }));
       }
-      /* бейдж доступных заданий на иконке */
+      /* бейдж доступных заданий на иконке (v6.4: поиск по id — иконок стало 7) */
       var qReady = Quests.list().filter(function (q) { return q.cur >= q.goal && !q.claimed; }).length;
       if (qReady > 0) {
-        var qb = Game.buttons[Game.buttons.length - 2];
-        qb.badge = qReady;
+        for (var qbi = 0; qbi < Game.buttons.length; qbi++) {
+          if (Game.buttons[qbi].id === 'quests') { Game.buttons[qbi].badge = qReady; break; }
+        }
+      }
+      /* v6.4: бейдж свободного спина на иконке колеса */
+      if (FS.Wheel && FS.Wheel.canFree()) {
+        for (var wbi = 0; wbi < Game.buttons.length; wbi++) {
+          if (Game.buttons[wbi].id === 'wheel') { Game.buttons[wbi].badge = '!'; break; }
+        }
       }
       var y2 = row + iw + uc * (L ? 0.078 : 0.055);
       var ev = Events.current();
@@ -4214,8 +4471,14 @@ if (!window.vkBridge) {
         var xx = cx - (ew2 + g2 + dw2) / 2;
         add(B('event', xx, y2, ew2, eh2, I18N.t('event_title') + ': ' + I18N.bladeName(ev.id),
           function () { Game.openEvent(); }, 'ghost', { tint: ev.tint }));
-        add(B('daily', xx + ew2 + g2, y2, dw2, eh2,
+        /* v6.4: рядом с «получить» — кнопка «🎬 ×2» (rewarded, 1 раз в день) */
+        var x2wL = Game.canDailyX2() ? dw2 * 0.24 : 0;
+        add(B('daily', xx + ew2 + g2, y2, dw2 - x2wL, eh2,
           I18N.t('daily_claim') + ' +' + Daily.streakBonus(Store.data.daily.streak), function () { Game.claimDaily(); }, 'gold', { icon: 'coin.png' }));
+        if (x2wL) {
+          add(B('daily_x2', xx + ew2 + g2 + dw2 - x2wL + 4, y2, x2wL - 4, eh2,
+            I18N.t('daily_x2'), function () { Game.claimDailyX2(); }, 'gold', { icon: 'ui_ad.png' }));
+        }
       } else {
         if (ev) {
           var ew = u * 0.62, eh = uc * 0.075;
@@ -4224,8 +4487,15 @@ if (!window.vkBridge) {
           y2 += eh + uc * 0.02;
         }
         if (canDaily) {
-          add(B('daily', cx - bw * 0.62 / 2, y2, bw * 0.62, uc * 0.085,
+          /* v6.4: «🎬 ×2» справа от кнопки дейлика (rewarded, 1 раз в день) */
+          var dwP = bw * 0.62, dxP = cx - dwP / 2;
+          var x2wP = Game.canDailyX2() ? dwP * 0.24 : 0;
+          add(B('daily', dxP, y2, dwP - x2wP, uc * 0.085,
             I18N.t('daily_claim') + ' +' + Daily.streakBonus(Store.data.daily.streak), function () { Game.claimDaily(); }, 'gold', { icon: 'coin.png' }));
+          if (x2wP) {
+            add(B('daily_x2', dxP + dwP - x2wP + 4, y2, x2wP - 4, uc * 0.085,
+              I18N.t('daily_x2'), function () { Game.claimDailyX2(); }, 'gold', { icon: 'ui_ad.png' }));
+          }
         }
       }
       var lw = u * 0.10;
@@ -4271,7 +4541,7 @@ if (!window.vkBridge) {
       return;
     }
 
-    if (s === 'shop' || s === 'ach' || s === 'settings' || s === 'quests' || s === 'rating' || s === 'event' || s === 'dex' || s === 'duel') {
+    if (s === 'shop' || s === 'ach' || s === 'settings' || s === 'quests' || s === 'rating' || s === 'event' || s === 'dex' || s === 'duel' || s === 'wheel') {
       var headH = u * (Game.headShiftFor(s) ? 0.21 : 0.16);
       var la = { x: 0, y: headH + Game.topInset(), w: W, h: H - headH - Game.topInset() - u * 0.04 - Game.bottomInset() };
       /* B1 v6.3: экран заданий — полоса стрик-чипов (7 ячеек) между
@@ -4281,6 +4551,7 @@ if (!window.vkBridge) {
         la = { x: la.x, y: la.y + chipH, w: la.w, h: Math.max(u * 0.2, la.h - chipH) };
       }
       UI.listArea = la;
+      Game.maybeShowBanner();   /* v6.4: баннер и на списках (после онбординга) */
       if (s === 'shop') Game.layoutShop(la);
       else if (s === 'ach') Game.layoutAch(la);
       else if (s === 'quests') Game.layoutQuests(la);
@@ -4288,6 +4559,7 @@ if (!window.vkBridge) {
       else if (s === 'event') Game.layoutEvent(la);
       else if (s === 'dex') Game.layoutDex(la);
       else if (s === 'duel') Game.layoutDuel(la);
+      else if (s === 'wheel') Game.layoutWheel(la);   /* v6.4 */
       else Game.layoutSettings(la);
       if (s === 'rating' && Game.platform && Game.platform.openLeaderboardBox) {
         var vw = u * 0.46, vh = u * 0.085;
@@ -4350,11 +4622,20 @@ if (!window.vkBridge) {
       var go = Game.go || {};
       /* A3 v6.3: продление дзена на экране итогов (один раз за раунд) */
       var zenRow = (go.mode === 'zen' && !go.zenExt && Game.adsAvailable('rewarded'));
+      /* ===== v6.4 PATCH: новые строки экрана итогов ===== */
+      /* «+15 сек» за rewarded в Аркаде/Дейлике (один раз за раунд) */
+      var extRow = ((go.mode === 'arcade' || go.mode === 'daily') && !go.timeExt && Game.adsAvailable('rewarded'));
+      /* «в историю» — при рекорде, вместе с offer-ом шеринга (1 раз за сессию) */
+      var storyRow = !!(go.shareOffer && Game.platform && Game.platform.story && Game.platform.name === 'vk');
+      /* «в избранное» — при рекорде, один раз за сессию (без награды: п. 2.6.2) */
+      var favRow = !!(go.isRecord && !Game._favPrompted && Game.platform && Game.platform.addToFavorites &&
+        !(Game.platform.isFavorite && Game.platform.isFavorite()));
       /* п. 3.2.2: панель результатов целиком внутри безопасной зоны —
          считаем высоту всех рядов и прижимаем блок вверх, если не влезает */
       var goRows = 1 + ((go.canContinue && Game.adsAvailable('rewarded')) ? 1 : 0) +
         (go.canContinue ? 1 : 0) + ((go.canDouble && Game.adsAvailable('rewarded')) ? 1 : 0) +
-        (zenRow ? 1 : 0) + (go.shareOffer ? 0.85 : 0) +
+        (zenRow ? 1 : 0) + (extRow ? 1 : 0) + (go.shareOffer ? 0.85 : 0) +
+        (storyRow ? 0.85 : 0) + (favRow ? 0.85 : 0) +
         ((Game.mode === 'duel' || Store.data.replay) ? 0.85 : 0);
       var goNeed = gh * 1.18 * goRows;
       var goBottomGap = Game.bottomInset() + u * 0.035;
@@ -4395,6 +4676,11 @@ if (!window.vkBridge) {
         add(B('zen_ext', gx, gy, gw, gh, '🎬 ' + I18N.t('zen_ext'), function () { Game.rewardZenExt(); }, 'gold', { icon: 'ui_ad.png' }));
         gy += gh * 1.18;
       }
+      if (extRow) {
+        /* v6.4: «+15 сек» за rewarded в Аркаде/Дейлике */
+        add(B('time_ext', gx, gy, gw, gh, '🎬 ' + I18N.t('time_ext_15'), function () { Game.rewardTimeExt(); }, 'gold', { icon: 'ui_ad.png' }));
+        gy += gh * 1.18;
+      }
       var shW = gh;
       var half = (gw - shW - 12) / 2;
       add(B('retry', gx, gy, half, gh, I18N.t('retry'), function () { Game.retry(); }, 'primary'));
@@ -4406,6 +4692,16 @@ if (!window.vkBridge) {
          карточка → gp.socials → navigator.share → буфер обмена */
       if (go.shareOffer) {
         add(B('share_rec', gx, gy, gw, gh * 0.85, I18N.t('share_card'), function () { Game.share(); }, 'gold', { icon: 'ui_share.png' }));
+        gy += gh * 1.02;
+      }
+      if (storyRow) {
+        /* v6.4: карточка рекорда → история VK */
+        add(B('share_story', gx, gy, gw, gh * 0.85, I18N.t('to_story'), function () { Game.shareStory(); }, 'gold', { icon: 'ui_share.png' }));
+        gy += gh * 1.02;
+      }
+      if (favRow) {
+        /* v6.4: prompt «в избранное» на рекорде (без награды) */
+        add(B('fav_add', gx, gy, gw, gh * 0.85, I18N.t('fav_prompt'), function () { Game.addFavoritePrompt(); }, 'ghost', { icon: 'ui_star.png' }));
         gy += gh * 1.02;
       }
       var third = (gw - 16) / 3;
@@ -4505,6 +4801,93 @@ if (!window.vkBridge) {
     Game.scrollMax = Math.max(0, Game.contentH - (la.y + la.h));
   };
 
+  /* =============== v6.4 PATCH: КОЛЕСО ФОРТУНЫ — раскладка и рендер ======= */
+  Game.layoutWheel = function (la) {
+    var W = Game.W, u = Game.unit, L = Game.orient === 'landscape';
+    var pad = u * 0.03;
+    var bw = Math.min(W - pad * 2, u * (L ? 0.52 : 0.82));
+    var bx = (W - bw) / 2;
+    var bh = u * 0.105;
+    var y = la.y + la.h - bh - u * 0.05;
+    var free = FS.Wheel.canFree();
+    var adLeft = FS.Wheel.adLeft();
+    if (Game.wheelAnim) {
+      Game.buttons.push(B('wheel_wait', bx, y, bw, bh, I18N.t('wheel_hint'), null, 'row', { enabled: false }));
+    } else if (free) {
+      Game.buttons.push(B('wheel_spin', bx, y, bw, bh, I18N.t('wheel_free'),
+        function () { FS.Wheel.spin(false); }, 'primary', { icon: 'ui_star.png' }));
+    } else if (adLeft > 0 && Game.adsAvailable('rewarded')) {
+      Game.buttons.push(B('wheel_spin_ad', bx, y, bw, bh,
+        I18N.t('wheel_ad') + '  ·  ' + adLeft, function () { FS.Wheel.spin(true); }, 'gold', { icon: 'ui_ad.png' }));
+    } else {
+      Game.buttons.push(B('wheel_wait', bx, y, bw, bh, I18N.t('wheel_tomorrow'), null, 'row', { enabled: false }));
+    }
+    Game.contentH = y + bh + pad;
+    Game.scrollMax = 0;
+  };
+
+  Game.drawWheel = function () {
+    var ctx = Game.ctx, u = Game.unit, L = Game.orient === 'landscape';
+    var la = UI.listArea;
+    if (!la) return;
+    var cx = Game.W / 2;
+    var R = Math.max(u * 0.12, Math.min(la.w * 0.34, (la.h - u * 0.30) * 0.5));
+    var cy = la.y + R + u * 0.06;
+    var seg = FS.Wheel.seg, n = seg.length, segA = U.TAU / n;
+    var ang = Game.wheelAngle || 0;
+    var a = Game.wheelAnim;
+    if (a) {
+      var t = U.clamp((Game.nowMs - a.t0) / a.dur, 0, 1);
+      var e = 1 - Math.pow(1 - t, 4);   /* easeOutQuart */
+      ang = a.from + (a.to - a.from) * e;
+      Game.wheelAngle = ang;
+      if (t >= 1) { try { FS.Wheel.finish(); } catch (e2) { Game.wheelAnim = null; } }
+    }
+    ctx.save();
+    /* обод */
+    U.circle(ctx, cx, cy, R + u * 0.016);
+    ctx.fillStyle = 'rgba(255,216,77,.92)'; ctx.fill();
+    U.circle(ctx, cx, cy, R + u * 0.007);
+    ctx.fillStyle = '#2a1a4a'; ctx.fill();
+    /* сегменты */
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(ang);
+    for (var i = 0; i < n; i++) {
+      var a0 = i * segA, a1 = a0 + segA;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, a0, a1); ctx.closePath();
+      ctx.globalAlpha = 0.94; ctx.fillStyle = seg[i].c; ctx.fill();
+      ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(20,8,40,.5)'; ctx.stroke();
+      ctx.save();
+      ctx.rotate(a0 + segA / 2);
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.font = '900 ' + Math.max(10, R * 0.14) + 'px ' + U.FONT;
+      ctx.fillStyle = '#20102e';
+      ctx.fillText(seg[i].premium ? '★' : ('+' + seg[i].coins), R * 0.86, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+    /* ступица */
+    U.circle(ctx, cx, cy, R * 0.15);
+    ctx.fillStyle = '#fff6d8'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(40,20,70,.6)'; ctx.stroke();
+    /* указатель сверху */
+    ctx.beginPath();
+    ctx.moveTo(cx - R * 0.08, cy - R - u * 0.018);
+    ctx.lineTo(cx + R * 0.08, cy - R - u * 0.018);
+    ctx.lineTo(cx, cy - R + R * 0.16);
+    ctx.closePath();
+    ctx.fillStyle = '#ffd84d'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#3a2160'; ctx.stroke();
+    /* инфо-строка под колесом */
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '700 ' + (u * 0.028) + 'px ' + U.FONT;
+    ctx.fillStyle = 'rgba(255,255,255,.82)';
+    var info = FS.Wheel.canFree() ? I18N.t('wheel_hint')
+      : I18N.t('wheel_left', { n: FS.Wheel.adLeft() });
+    ctx.fillText(info, cx, cy + R + u * 0.075, Game.W * 0.92);
+    ctx.restore();
+  };
+
   Game.layoutAch = function (la) {
     var W = Game.W, u = Game.unit;
     var pad = u * 0.028, rh = u * 0.145;
@@ -4524,13 +4907,21 @@ if (!window.vkBridge) {
     var W = Game.W, u = Game.unit;
     var pad = u * 0.03, rh = u * 0.17;
     var qs = Quests.list();
+    var canX2 = Game.canQuestX2();   /* v6.4 */
     for (var i = 0; i < qs.length; i++) {
       var q = qs[i];
       var y = la.y + pad + i * (rh + pad * 0.6);
-      Game.buttons.push(B('quest_' + i, pad, y, W - pad * 2, rh, I18N.t(q.id, { n: q.goal }),
+      /* v6.4: у готового к выдаче задания — кнопка «🎬×2» (rewarded, лимит/день) */
+      var x2Row = canX2 && !q.claimed && q.cur >= q.goal;
+      var x2w = x2Row ? rh * 1.05 : 0;
+      Game.buttons.push(B('quest_' + i, pad, y, W - pad * 2 - (x2Row ? x2w + 6 : 0), rh, I18N.t(q.id, { n: q.goal }),
         (function (idx) { return function () { Game.claimQuest(idx); }; })(i),
         (q.claimed ? 'row_on' : (q.cur >= q.goal ? 'row_claim' : 'row')),
         { list: true, quest: q, idx: i }));
+      if (x2Row) {
+        Game.buttons.push(B('quest2x_' + i, W - pad - x2w, y, x2w, rh, '🎬×2',
+          (function (idx) { return function () { Game.claimQuestX2(idx); }; })(i), 'gold', { list: true }));
+      }
     }
     /* B3 v6.3: «дуэль дня» — общий сид дня, переиспользует механику дуэлей */
     var yD = la.y + pad + qs.length * (rh + pad * 0.6);
@@ -4632,6 +5023,11 @@ if (!window.vkBridge) {
     var y = la.y + pad;
     Game.buttons.push(B('duel_create', pad, y, bw, bh, I18N.t('duel_create'), function () { Game.duelCreate(); }, 'primary'));
     y += bh + pad * 0.6;
+    /* v6.4: нативное приглашение друзей VK (без награды за соц. действие) */
+    if (Game.platform && Game.platform.invite && Game.platform.name === 'vk') {
+      Game.buttons.push(B('duel_invite', pad, y, bw, bh * 0.8, I18N.t('invite_friend'), function () { Game.inviteFriends(); }, 'gold', { icon: 'ui_share.png' }));
+      y += bh * 0.8 + pad * 0.6;
+    }
     /* код-дисплей */
     Game.buttons.push(B('duel_disp', pad, y, bw, bh * 0.8, Game.duelBuf || '—', null, 'row', { list: true, enabled: false }));
     y += bh * 0.8 + pad * 0.6;
@@ -4671,6 +5067,10 @@ if (!window.vkBridge) {
       ['delete', I18N.t('set_delete'), '', function () { Game.askDelete(); }, 'danger'],
       ['reset', I18N.t('set_reset'), '', function () { Game.askReset(); }, 'danger']
     ];
+    /* v6.4: сообщество игры — канал возврата (нужен CFG.vkGroupId > 0) */
+    if (CFG.vkGroupId && Game.platform && Game.platform.joinGroup && Game.platform.name === 'vk') {
+      rows.push(['community', I18N.t('community'), '', function () { Game.joinCommunity(); }]);
+    }
     if (Game.platform && Game.platform.addToFavorites) {
       rows.push(['vkfav', I18N.t('vk_fav'), '', function () {
         Game.platform.addToFavorites().then(function (ok) {
@@ -4752,8 +5152,175 @@ if (!window.vkBridge) {
   Game.shareDuel = function () {
     var code = Game.duelCode || Game.roundSeed;
     var text = I18N.t('duel_share', { code: code + ':' + Game.score, score: Game.score });
+    /* ===== v6.4 PATCH: внутренняя ссылка VK с deep-link дуэли — друг
+       тапает пост и сразу играет тот же сид (п. 4.1.8: ссылка ведёт на эту
+       же платформу, а не на сторонний ресурс) ===== */
+    var plD = Game.platform;
+    var linkD = (plD && plD.appLink) ? plD.appLink('duel=' + code + ':' + Game.score) : null;
+    if (linkD) text += '\n' + I18N.t('share_link_line', { link: linkD });
+    if (FS.Analytics) FS.Analytics.ev('share', { type: 'duel', link: !!linkD });
     Game.shareWithText(text);
   };
+  /* ===================== v6.4 PATCH: НОВЫЕ ДЕЙСТВИЯ ====================== */
+
+  /* Deep-link дуэли: запустить раунд по коду из ссылки друга */
+  Game.consumePendingDuel = function () {
+    var pd = Game.pendingDuel;
+    if (!pd || !Store.data.tutorial_done || !Game.consentOK) return;
+    if (Game.screen === 'loading' || Game.screen === 'boot') return;
+    Game.pendingDuel = null;
+    Game.duelBuf = pd.target ? (pd.seed + ':' + pd.target) : String(pd.seed);
+    Game.duelTarget = pd.target;
+    Game.duelCode = pd.seed;
+    Game.toast(I18N.t('duel'), I18N.t('duel_from_link'), '#ffd75a');
+    Game.logMsg('deep-link-duel:' + pd.seed);
+    if (FS.Analytics) FS.Analytics.ev('deep_link_duel', { seed: pd.seed });
+    Game.startRound('duel', { seed: pd.seed });
+  };
+
+  /* «+15 секунд» за rewarded в Аркаде/Дейлике (один раз за раунд) —
+     повторяет механику A3 (дзен +30с), награда выдаётся только за ролик */
+  Game.rewardTimeExt = function () {
+    if (Game.timeExtUsed || !(Game.mode === 'arcade' || Game.mode === 'daily')) { Snd.play('back'); return; }
+    Game.showRewarded(function () {
+      Game.timeExtUsed = true;
+      if (Game.go) Game.go.timeExt = true;
+      if (Game.screen === 'gameover' && Game.go && (Game.go.mode === 'arcade' || Game.go.mode === 'daily')) {
+        Game.timeLeft = Math.max(0, Game.timeLeft) + CFG.timeExtArcade;
+        Game.screen = 'playing'; Game.running = true; Game.paused = false; Game.acc = 0;
+        if (Game.round) { Game.round.nextSpawn = 0.4; Game.round.spawnAcc = 1; }
+        Game.layoutScreen();
+        Game.fade = 1; Game.fadeDir = -1;
+        if (Game.platform && Game.platform.gameplayStart) {
+          try { var p = Game.platform.gameplayStart(); if (p && p.catch) p.catch(function () { }); } catch (e) { }
+        }
+        Snd.play('start');
+        Game.logMsg('time-ext:resume');
+      } else {
+        Game.timeLeft += CFG.timeExtArcade;
+        Game.toast(I18N.t('time_ext_15'), '+' + CFG.timeExtArcade, '#5cff9d');
+        Game.logMsg('time-ext');
+      }
+    }, null, 'time-ext');
+  };
+
+  /* Карточка рекорда → история VK (StoryBox); фолбэк — стена/буфер */
+  Game.shareStory = function () {
+    var pl = Game.platform;
+    var score = Game.go ? Game.go.score : (Store.data.stats.best_round_score || 0);
+    var text = I18N.t('share_text', { score: score, combo: Store.data.stats.max_combo || 0 });
+    function fallback() { Game.shareWithText(text); }
+    try {
+      var card = Game.makeCard();
+      if (card && card.toDataURL && pl && pl.story) {
+        var url = card.toDataURL('image/png');
+        Promise.resolve(pl.story(url)).then(function (ok) {
+          if (FS.Analytics) FS.Analytics.ev('share', { type: 'story', ok: !!ok });
+          if (ok) Snd.play('ui'); else fallback();
+        })['catch'](fallback);
+        return;
+      }
+    } catch (e) { }
+    fallback();
+  };
+
+  /* «В избранное» — prompt на рекорде (без награды: п. 2.6.2 Правил) */
+  Game.addFavoritePrompt = function () {
+    Game._favPrompted = true;
+    var pl = Game.platform;
+    if (pl && pl.addToFavorites) {
+      pl.addToFavorites().then(function (ok) {
+        if (ok) {
+          Game.toast(I18N.t('fav_ok'), '', '#8dffbe'); Snd.play('coin');
+          if (FS.Analytics) FS.Analytics.ev('fav_add');
+        } else Snd.play('back');
+        if (Game.screen === 'gameover') Game.layoutScreen();
+      });
+    }
+  };
+
+  /* Нативное приглашение друзей (VKWebAppShowInviteBox) */
+  Game.inviteFriends = function () {
+    var pl = Game.platform;
+    if (pl && pl.invite) {
+      pl.invite().then(function (ok) {
+        Game.toast(ok ? I18N.t('invite_ok') : I18N.t('invite_fail'), '', ok ? '#8dffbe' : '#ff8fa3');
+        if (ok) Snd.play('coin');
+        if (FS.Analytics) FS.Analytics.ev('invite', { ok: !!ok });
+      });
+    } else Snd.play('back');
+  };
+
+  /* Ежедневный бонус ×2 за rewarded (один раз в день) */
+  Game.canDailyX2 = function () {
+    return Daily.canClaim() && Game.adsAvailable('rewarded') &&
+      (Store.data.daily2x || {}).date !== Daily.today();
+  };
+  Game.claimDailyX2 = function () {
+    if (!Game.canDailyX2()) { Snd.play('back'); return; }
+    Game.showRewarded(function () {
+      var got = Daily.claim();
+      if (got > 0) {
+        Store.addCoins(got);   /* вторая половина — суммарно ×2 */
+        Store.data.daily2x.date = Daily.today();
+        Achievements.check();
+        Game.toast(I18N.t('daily_bonus') + ' ×2', '+' + (got * 2) + ' ⬤', '#ffdf6b');
+        Snd.play('coin');
+        Game.confetti(Game.W / 2, Game.H * 0.35, 18, ['#ffd84d', '#8dffbe', '#7fd8ff']);
+        if (FS.Analytics) FS.Analytics.ev('daily_claim', { x2: true, coins: got * 2 });
+      }
+      Store.flush();
+      Game.layoutScreen();
+    }, null, 'daily-x2');
+  };
+
+  /* ×2 награда задания за rewarded (лимит в день — CFG.questDoublesPerDay) */
+  Game.canQuestX2 = function () {
+    var d = Store.data.quest2x;
+    var today = Daily.today();
+    if (d.date !== today) { d.date = today; d.used = 0; }
+    return Game.adsAvailable('rewarded') && (d.used || 0) < CFG.questDoublesPerDay;
+  };
+  Game.claimQuestX2 = function (i) {
+    if (!Game.canQuestX2()) { Snd.play('back'); return; }
+    var qs = Quests.list();
+    var q = qs[i];
+    if (!q || q.claimed || q.cur < q.goal) { Snd.play('back'); return; }
+    Game.showRewarded(function () {
+      var got = Quests.claim(i);
+      if (got > 0) {
+        Store.addCoins(got);
+        Store.data.quest2x.used = (Store.data.quest2x.used || 0) + 1;
+        Game.toast(I18N.t('quest_title') + ' ×2', '+' + (got * 2) + ' ⬤', '#8dffbe');
+        Game.confetti(Game.W / 2, Game.H * 0.35, 18, ['#8dffbe', '#ffd84d', '#7fd8ff']);
+        if (FS.Analytics) FS.Analytics.ev('quest_claim', { id: q.id, x2: true });
+      }
+      Store.flush();
+      Game.layoutScreen();
+    }, null, 'quest-x2');
+  };
+
+  /* Сообщество игры (канал возврата); включается CFG.vkGroupId */
+  Game.joinCommunity = function () {
+    var pl = Game.platform;
+    if (!pl || !pl.joinGroup || !CFG.vkGroupId) { Snd.play('back'); return; }
+    Promise.resolve(pl.joinGroup(CFG.vkGroupId)).then(function (ok) {
+      if (ok && pl.allowGroupMsgs) return pl.allowGroupMsgs(CFG.vkGroupId);
+      return ok;
+    }).then(function (ok) {
+      if (ok) {
+        Game.toast(I18N.t('community_join'), '', '#8dffbe'); Snd.play('coin');
+        if (FS.Analytics) FS.Analytics.ev('join_group');
+      } else Snd.play('back');
+    });
+  };
+
+  /* Колесо фортуны */
+  Game.openWheel = function () {
+    Game.gotoScreen('wheel'); Snd.play('ui');
+    if (FS.Analytics) FS.Analytics.ev('open_wheel');
+  };
+
   Game.openSettings = function () { Game.gotoScreen('settings'); Snd.play('ui'); };
   Game.toMenu = function (fromGame) {
     var played = Game.adGate.playTime;
@@ -5096,6 +5663,7 @@ if (!window.vkBridge) {
       /* B1 v6.3: награда = ступень стрика [30,40,50,60,70,80,100] */
       Game.toast(I18N.t('daily_bonus') + ' · ' + I18N.t('streak_day', { n: Store.data.daily.streak }),
         '+' + got + ' ⬤', '#ffdf6b');
+      if (FS.Analytics) FS.Analytics.ev('daily_claim', { x2: false, coins: got });
       Achievements.check();
       Game.layoutScreen();
     }
@@ -5186,6 +5754,13 @@ if (!window.vkBridge) {
     var score = go ? go.score : (Store.data.stats.best_round_score || 0);
     var combo = Store.data.stats.max_combo || 0;
     var text = I18N.t('share_text', { score: score, combo: combo });
+    /* ===== v6.4 PATCH: ссылка на игру в посте рекорда (органический
+       приток); в VK-среде — сначала нативный диалог публикации на стене ===== */
+    var plS = Game.platform;
+    var linkS = (plS && plS.appLink) ? plS.appLink('') : null;
+    if (linkS) text += '\n' + I18N.t('share_link_line', { link: linkS });
+    if (FS.Analytics) FS.Analytics.ev('share', { type: 'record', link: !!linkS });
+    if (plS && plS.name === 'vk' && plS.postToWall) return Game.shareWithText(text);
     var gp = Game.platform && Game.platform.gp;
     var soc = gp && gp.socials;
     if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
@@ -5538,7 +6113,7 @@ if (!window.vkBridge) {
 
   Game.bgFor = function () {
     var s = Game.screen;
-    if (s === 'shop' || s === 'ach' || s === 'settings' || s === 'quests' || s === 'dex' || s === 'event') return 'bg_shop.png';
+    if (s === 'shop' || s === 'ach' || s === 'settings' || s === 'quests' || s === 'dex' || s === 'event' || s === 'wheel') return 'bg_shop.png';
     if (s === 'menu' || s === 'modes' || s === 'confirm' || s === 'duel') return 'bg_menu.png';
     return 'bg_game.png';
   };
@@ -6941,6 +7516,11 @@ if (!window.vkBridge) {
       Game.drawCoins();
       Game.drawHeader(I18N.t('rating_title'), I18N.t('rating_top') + (Game.lbRank ? '  •  ' + I18N.t('rating_place', { n: Game.lbRank }) : ''));
       Game.drawScrollHint();
+    } else if (s === 'wheel') {
+      /* v6.4: колесо фортуны */
+      Game.drawCoins();
+      Game.drawHeader(I18N.t('wheel_title'), I18N.t('wheel_hint'));
+      Game.drawWheel();
     } else if (s === 'settings') {
       Game.drawCoins();
       Game.drawHeader(I18N.t('set_title'));
@@ -7730,6 +8310,8 @@ if (!window.vkBridge) {
        Game.maybeShowBanner() — при первом заходе в главное меню. */
     if (!Store.data.tutorial_done) Game.startTutorial();
     else { Game.screen = 'menu'; Game.menuT = 0; Game.layoutScreen(); }
+    /* v6.4 PATCH: пришли по ссылке друга — сразу запускаем дуэль */
+    Game.consumePendingDuel();
   };
 
   /* Показ липкого баннера: не раньше, чем пользователь прошёл онбординг
@@ -7738,7 +8320,10 @@ if (!window.vkBridge) {
      зона уменьшается на его высоту (Game.bottomInset → Game.inset). */
   Game.maybeShowBanner = function () {
     if (Game._bannerRequested) return;
-    if (!Game.consentOK || Game.screen !== 'menu') return;
+    /* v6.4: баннер показывается не только в меню, но и на неигровых экранах
+       (онбординг и геймплей — по-прежнему без баннера: п. 5.1.4.2а Правил) */
+    var okScreens = { menu: 1, shop: 1, ach: 1, quests: 1, rating: 1, event: 1, dex: 1, wheel: 1 };
+    if (!Game.consentOK || !okScreens[Game.screen]) return;
     if (!Store.data.tutorial_done) return;
     var pl = Game.platform;
     if (!pl || pl.name !== 'vk' || !pl.showBanner) return;
@@ -7773,6 +8358,23 @@ if (!window.vkBridge) {
     Game.adGate.sessionStart = 0;
     Game.adGate.lastInterstitial = -1e9;
     Game.adGate.lastReward = -1e9;   /* A4 v6.3 */
+    /* ===== v6.4 PATCH: deep-link дуэли — #duel=SEED[:SCORE] из ссылки друга.
+       Ссылка вида vk.com/app{ID}#duel=123:456 открывает игру с этим хэшем;
+       разбираем его здесь, а запускаем после согласия/обучения
+       (Game.consumePendingDuel). ===== */
+    Game.pendingDuel = null;
+    Game.wheelAngle = 0; Game.wheelAnim = null;
+    Game._favPrompted = false;
+    try {
+      var dl = (location.hash || '') + '&' + (location.search || '');
+      var dm = /[#&?]duel=(\d{1,10})(?::(\d{1,10}))?/.exec(dl);
+      if (dm) {
+        Game.pendingDuel = {
+          seed: parseInt(dm[1], 10) >>> 0,
+          target: dm[2] ? parseInt(dm[2], 10) : null
+        };
+      }
+    } catch (e) { }
     /* v6.3: сброс сессионных флагов монетизации/возврата */
     Game._fxAutoDone = false; Game._fxHot = 0;
     Game._top10Toasted = false;
