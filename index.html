@@ -383,6 +383,24 @@ if (!window.vkBridge) {
       community: 'Сообщество игры',
       community_join: 'Спасибо за подписку!',
       share_link_line: 'Играть: {link}',
+      /* ===== v6.5 PATCH: дуэли с соперником ===== */
+      duel_my_code: 'Мой код',
+      duel_copy: 'Скопировать код',
+      duel_copied: 'Код скопирован!',
+      duel_need_target: 'Дуэль — только с соперником: введите его полный код SEED:SCORE',
+      duel_play_first: 'Сыграйте раунд — ваш счёт станет целью для друга!',
+      duel_how1: '1) Создайте вызов и сыграйте раунд.',
+      duel_how2: '2) Отправьте код другу: ваш счёт — цель для него.',
+      duel_how3: '3) Получите код друга в ответ — введите его и узнайте результат!',
+      duel_hist: 'История дуэлей',
+      duel_you: 'Вы',
+      duel_rival: 'Соперник',
+      duel_target: 'Цель: {n}',
+      duel_send: 'Отправить свой счёт',
+      duel_send_ch: 'Отправить вызов',
+      duel_draw: 'НИЧЬЯ',
+      duel_res_share: 'Дуэль {seed}: я {mine} — соперник {theirs}. Итог: {res}!',
+      duel_res_share_btn: 'Поделиться результатом',
       theme_on: 'Тема: {name}'
       /* Названия сторонних площадок из сборки удалены (п. 4.2.6 Правил VK):
          в интерфейсе игры не должно быть упоминаний платформ, отличных от VK. */
@@ -449,6 +467,23 @@ if (!window.vkBridge) {
       community: 'Game community',
       community_join: 'Thanks for subscribing!',
       share_link_line: 'Play: {link}',
+      duel_my_code: 'My code',
+      duel_copy: 'Copy code',
+      duel_copied: 'Code copied!',
+      duel_need_target: 'Duels need a rival: enter their full code SEED:SCORE',
+      duel_play_first: 'Play the round — your score becomes your friend’s target!',
+      duel_how1: '1) Create a challenge and play the round.',
+      duel_how2: '2) Send the code: your score is the target to beat.',
+      duel_how3: '3) Get your friend’s code back — enter it to see the result!',
+      duel_hist: 'Duel history',
+      duel_you: 'You',
+      duel_rival: 'Rival',
+      duel_target: 'Target: {n}',
+      duel_send: 'Send my score',
+      duel_send_ch: 'Send challenge',
+      duel_draw: 'DRAW',
+      duel_res_share: 'Duel {seed}: me {mine} — rival {theirs}. Result: {res}!',
+      duel_res_share_btn: 'Share result',
       theme_on: 'Theme: {name}'
     }
 };
@@ -1474,7 +1509,7 @@ if (!window.vkBridge) {
   /* ===================== ЧАСТЬ A: КОНФИГ, УТИЛИТЫ, АССЕТЫ, ЗВУК ======== */
 
   var CFG = {
-    version: '6.4.0',
+    version: '6.5.0',
     saveKey: 'fs_save_v1',
     schema: 3,
     /* Зазор между липким баннером и элементами интерфейса, px (п. 5.1.4.2г) */
@@ -2091,7 +2126,7 @@ if (!window.vkBridge) {
       },
       settings: { sound: true, music: true, lang: null, vibrate: true, fx: 'full',
         sens: 1, mirror: false, cb: false, set: 'classic', accepted: false },
-      duels: { created: 0, played: 0, won: 0, lost: 0 },
+      duels: { created: 0, played: 0, won: 0, lost: 0, last: null, history: [] },
       daily_best: { date: '', score: 0, plays: 0 },
       fruit_stats: {},
       event_blades: [],
@@ -3586,6 +3621,8 @@ if (!window.vkBridge) {
     }
     Game.roundRng = FS.RNG.mulberry32(Game.roundSeed ^ 0x9e3779b9);
     Game.duelWin = null;
+    Game.duelMine = false;   /* v6.5: раунд-вызов (без цели) */
+    Game.duelResult = null;
     Game.recOn = true;
     Game.recPts = [];
     Game.fruits.clear(); Game.halves.clear(); Game.parts.clear(); Game.popups.clear(); Game.splats.clear(); Game.fx.clear();
@@ -3659,10 +3696,21 @@ if (!window.vkBridge) {
       if (Game.score > db.score) { db.score = Game.score; isRecord = true; }
     }
     if (mode === 'duel' && (Game.duelTarget !== null && Game.duelTarget !== undefined)) {
+      /* v6.5: ничья учитывается отдельно; история последних 8 дуэлей */
       var dw = Game.score > Game.duelTarget;
+      var dr = (Game.score === Game.duelTarget) ? 0 : (dw ? 1 : -1);
       Store.data.duels.played++;
-      if (dw) Store.data.duels.won++; else Store.data.duels.lost++;
-      Game.duelWin = dw;
+      if (dr === 1) Store.data.duels.won++; else if (dr === -1) Store.data.duels.lost++;
+      Game.duelWin = (dr === 0) ? 'draw' : dw;
+      var dh = Store.data.duels.history || (Store.data.duels.history = []);
+      dh.unshift({ seed: Game.roundSeed, mine: Game.score, theirs: Game.duelTarget, res: dr, ts: Date.now() });
+      if (dh.length > 8) dh.length = 8;
+      if (FS.Analytics) FS.Analytics.ev('duel_challenged', { res: dr });
+    }
+    /* v6.5: раунд-вызов (создал дуэль, цели нет) — личный код со счётом */
+    if (mode === 'duel' && (Game.duelTarget === null || Game.duelTarget === undefined) && Game.duelMine) {
+      Store.data.duels.last = { seed: Game.roundSeed, score: Game.score, resolved: false, ts: Date.now() };
+      if (FS.Analytics) FS.Analytics.ev('duel_challenge_created', { seed: Game.roundSeed, score: Game.score });
     }
     if (isRecord && Game.recPts && Game.recPts.length >= 6 && Game.recPts.length < 6000) {
       Store.data.replay = { mode: mode, seed: Game.roundSeed, score: Game.score, pts: Game.recPts.slice(0, 4000), ts: Date.now() };
@@ -4513,29 +4561,28 @@ if (!window.vkBridge) {
          равноправная карточка. Тексты карточек разведены по полосам без
          пересечений (см. Game.drawModeCard). */
       var cw, ch, x, y3, i2;
-      var dbNow = Store.data.daily_best;
+      /* v6.5: режим «День» (общий сид дня) удалён — остались 4 карточки */
       var modes = [
         ['classic', I18N.t('mode_classic'), I18N.t('mode_classic_desc'), I18N.t('mode_classic_desc_s'), '#ff5a6e', Store.data.best_scores.classic],
         ['arcade', I18N.t('mode_arcade'), I18N.t('mode_arcade_desc'), I18N.t('mode_arcade_desc_s'), '#ffbe24', Store.data.best_scores.arcade],
         ['zen', I18N.t('mode_zen'), I18N.t('mode_zen_desc'), I18N.t('mode_zen_desc_s'), '#5cff9d', Store.data.best_scores.zen],
-        ['daily', I18N.t('daily_mode'), I18N.t('daily_desc'), I18N.t('daily_desc_s'), '#37f6ff', (dbNow && dbNow.date === Daily.today()) ? dbNow.score : 0],
         ['duel', I18N.t('duel'), I18N.t('duel_desc'), I18N.t('duel_desc_s'), '#ffd75a', -1]
       ];
       var sideM = Math.max(Game.sideInset('left'), Game.sideInset('right'));
       var tiM = Game.topInset(), biM = Game.bottomInset();
       if (L) {
         var avail5 = W - sideM * 2 - u * 0.04;
-        cw = Math.min(avail5 / 5.42, u * 0.36);
+        cw = Math.min(avail5 / 4.36, u * 0.40);   /* v6.5: 4 карточки */
         y3 = tiM + H * 0.15;
         ch = H - biM - H * 0.035 - y3;
-        var tot5 = cw * 5 + cw * 0.105 * 4; x = cx - tot5 / 2;
-        for (i2 = 0; i2 < 5; i2++) addModeCard(modes[i2], x + i2 * (cw * 1.105), y3, cw, ch);
+        var tot5 = cw * 4 + cw * 0.105 * 3; x = cx - tot5 / 2;
+        for (i2 = 0; i2 < 4; i2++) addModeCard(modes[i2], x + i2 * (cw * 1.105), y3, cw, ch);
       } else {
         cw = Math.min(W - sideM * 2 - u * 0.04, u * 1.05);
         y3 = tiM + H * 0.145;
         var gapV = H * 0.012;
-        ch = Math.min(H * 0.150, (H - biM - u * 0.03 - y3 - gapV * 4) / 5);
-        for (i2 = 0; i2 < 5; i2++) addModeCard(modes[i2], cx - cw / 2, y3 + i2 * (ch + gapV), cw, ch);
+        ch = Math.min(H * 0.170, (H - biM - u * 0.03 - y3 - gapV * 3) / 4);   /* v6.5: 4 карточки */
+        for (i2 = 0; i2 < 4; i2++) addModeCard(modes[i2], cx - cw / 2, y3 + i2 * (ch + gapV), cw, ch);
       }
       addBack();
       return;
@@ -4636,7 +4683,7 @@ if (!window.vkBridge) {
         (go.canContinue ? 1 : 0) + ((go.canDouble && Game.adsAvailable('rewarded')) ? 1 : 0) +
         (zenRow ? 1 : 0) + (extRow ? 1 : 0) + (go.shareOffer ? 0.85 : 0) +
         (storyRow ? 0.85 : 0) + (favRow ? 0.85 : 0) +
-        ((Game.mode === 'duel' || Store.data.replay) ? 0.85 : 0);
+        (Game.mode === 'duel' ? 1.87 : (Store.data.replay ? 0.85 : 0));   /* v6.5: 2 ряда дуэли */
       var goNeed = gh * 1.18 * goRows;
       var goBottomGap = Game.bottomInset() + u * 0.035;
       var goPanelBottom = L ? (H * 0.12 + H * 0.76) : (H * 0.055 + H * 0.46);
@@ -4706,9 +4753,16 @@ if (!window.vkBridge) {
       }
       var third = (gw - 16) / 3;
       if (Game.mode === 'duel') {
-        add(B('shareduel', gx, gy, third, gh * 0.85, I18N.t('duel'), function () { Game.shareDuel(); }, 'gold'));
-        add(B('duel_again', gx + third + 8, gy, third, gh * 0.85, I18N.t('retry'), function () { Game.startRound('duel', { seed: Game.roundSeed }); }, 'ghost'));
-        add(B('replayw', gx + (third + 8) * 2, gy, third, gh * 0.85, '▶', function () { Game.startReplay(); }, 'ghost'));
+        /* v6.5: реванш одним ситом убран (дуэль без соперника). Есть отправка
+           кода и копирование; ниже — просмотр записи раунда. */
+        var isMine = (Game.duelTarget === null || Game.duelTarget === undefined);
+        var hw2 = (gw - 16) / 2;
+        add(B('shareduel', gx, gy, hw2, gh * 0.85, isMine ? I18N.t('duel_send_ch') : I18N.t('duel_send'),
+          function () { Game.shareDuel(); }, 'gold', { icon: 'ui_share.png' }));
+        add(B('copyduel', gx + hw2 + 8, gy, hw2, gh * 0.85, I18N.t('duel_copy'),
+          function () { Game.copyDuelCode(); }, 'ghost'));
+        gy += gh * 1.02;
+        add(B('replayw', gx, gy, gw, gh * 0.85, I18N.t('replay_watch'), function () { Game.startReplay(); }, 'ghost', { icon: 'ui_play.png' }));
       } else if (Store.data.replay) {
         add(B('replayw', gx, gy, gw, gh * 0.85, I18N.t('replay_watch'), function () { Game.startReplay(); }, 'ghost', { icon: 'ui_play.png' }));
       }
@@ -4731,6 +4785,17 @@ if (!window.vkBridge) {
       var cfy = H * 0.52;
       add(B('cyes', cx - cfw / 2, cfy, cfw, cfh, I18N.t('yes'), function () { Game.confirmYes(); }, 'danger'));
       add(B('cno', cx - cfw / 2, cfy + cfh * 1.25, cfw, cfh, I18N.t('no'), function () { Game.confirmNo(); }, 'ghost'));
+      return;
+    }
+
+    /* v6.5: результат дуэли по возврату вашего вызова (без переигрывания) */
+    if (s === 'duelresult') {
+      var rw = Math.min(W * 0.74, u * 0.92), rh3 = u * 0.105;
+      var ry3 = H * 0.56;
+      add(B('dr_share', cx - rw / 2, ry3, rw, rh3, I18N.t('duel_res_share_btn'),
+        function () { Game.shareDuelResult(); }, 'gold', { icon: 'ui_share.png' }));
+      add(B('dr_menu', cx - rw / 2, ry3 + rh3 * 1.25, rw, rh3, I18N.t('menu'),
+        function () { Game.toMenu(false); }, 'ghost'));
       return;
     }
 
@@ -4923,11 +4988,8 @@ if (!window.vkBridge) {
           (function (idx) { return function () { Game.claimQuestX2(idx); }; })(i), 'gold', { list: true }));
       }
     }
-    /* B3 v6.3: «дуэль дня» — общий сид дня, переиспользует механику дуэлей */
-    var yD = la.y + pad + qs.length * (rh + pad * 0.6);
-    Game.buttons.push(B('duel_daily', pad, yD, W - pad * 2, rh * 0.8,
-      '⚔ ' + I18N.t('duel_daily'), function () { Game.duelDaily(); }, 'gold', { list: true }));
-    Game.contentH = yD + rh * 0.8 + pad;
+    /* v6.5: «дуэль дня» убрана с экрана заданий */
+    Game.contentH = la.y + pad + qs.length * (rh + pad * 0.6);
     Game.scrollMax = Math.max(0, Game.contentH - (la.y + la.h));
   };
 
@@ -5028,6 +5090,35 @@ if (!window.vkBridge) {
       Game.buttons.push(B('duel_invite', pad, y, bw, bh * 0.8, I18N.t('invite_friend'), function () { Game.inviteFriends(); }, 'gold', { icon: 'ui_share.png' }));
       y += bh * 0.8 + pad * 0.6;
     }
+    /* ===== v6.5: ВАШ ЛИЧНЫЙ КОД вызова (сеанс и после него) ===== */
+    var dl0 = Store.data.duels.last;
+    if (dl0 && dl0.seed) {
+      var myTxt = I18N.t('duel_my_code') + ': ' + dl0.seed + ':' + dl0.score +
+        (dl0.resolved ? '' : '  •');
+      Game.buttons.push(B('duel_mycode', pad, y, bw, bh * 0.8, myTxt,
+        function () { Game.copyLastCode(); }, dl0.resolved ? 'row' : 'row_claim', { list: true }));
+      y += bh * 0.8 + pad * 0.6;
+    }
+    /* как это работает — три строки-подсказки */
+    var hows = [I18N.t('duel_how1'), I18N.t('duel_how2'), I18N.t('duel_how3')];
+    for (var hw = 0; hw < hows.length; hw++) {
+      Game.buttons.push(B('duel_how_' + hw, pad, y, bw, bh * 0.62, hows[hw], null, 'row', { list: true, enabled: false }));
+      y += bh * 0.62 + pad * 0.35;
+    }
+    /* история последних дуэлей */
+    var dh0 = Store.data.duels.history || [];
+    if (dh0.length) {
+      Game.buttons.push(B('duel_hist_h', pad, y, bw, bh * 0.6, I18N.t('duel_hist'), null, 'row', { list: true, enabled: false }));
+      y += bh * 0.6 + pad * 0.35;
+      for (var hi = 0; hi < Math.min(4, dh0.length); hi++) {
+        var h0 = dh0[hi];
+        var mk = h0.res === 1 ? '✓ ' : (h0.res === 0 ? '— ' : '✗ ');
+        Game.buttons.push(B('duel_hist_' + hi, pad, y, bw, bh * 0.6,
+          mk + I18N.t('duel_you') + ' ' + h0.mine + ' : ' + h0.theirs + ' ' + I18N.t('duel_rival'),
+          null, h0.res === 1 ? 'row_on' : 'row', { list: true, enabled: false }));
+        y += bh * 0.6 + pad * 0.35;
+      }
+    }
     /* код-дисплей */
     Game.buttons.push(B('duel_disp', pad, y, bw, bh * 0.8, Game.duelBuf || '—', null, 'row', { list: true, enabled: false }));
     y += bh * 0.8 + pad * 0.6;
@@ -5123,32 +5214,57 @@ if (!window.vkBridge) {
     Store.save();
     Game.duelTarget = null;
     Game.duelCode = seed;
+    /* v6.5: это раунд-вызов — счёт станет целью соперника */
     Game.startRound('duel', { seed: seed });
+    Game.duelMine = true;
+    Game.toast(I18N.t('duel'), I18N.t('duel_play_first'), '#ffd84d');
+    if (FS.Analytics) FS.Analytics.ev('duel_create', { seed: seed });
   };
   Game.duelStart = function () {
+    /* ===== v6.5: дуэль невозможна без соперника =====
+       Код вида SEED:SCORE — вызов от соперника: играем против его счёта.
+       Код вида SEED без счёта:
+         • если это ВАШ собственный вызов (duels.last) — это возврат от
+           соперника без счёта? нет: возврат всегда со счётом, поэтому
+           «голый» код больше не запускает раунд вообще;
+         • подсказываем ввести полный код соперника.
+       Если seed совпадает с вашим вызовом и пришёл СО счётом — раунд не
+       переигрываем: сразу сравниваем и показываем экран результата. */
     var buf = (Game.duelBuf || '').trim();
     if (!buf) { Snd.play('back'); return; }
     var parts = buf.split(':');
     var seed = parseInt(parts[0], 10) >>> 0;
     var target = parts.length > 1 ? parseInt(parts[1], 10) : null;
     if (!isFinite(seed)) { Snd.play('back'); return; }
-    Game.duelTarget = (target !== null && isFinite(target)) ? target : null;
+    var hasTarget = (target !== null && isFinite(target));
+    if (!hasTarget) {
+      Game.toast(I18N.t('duel'), I18N.t('duel_need_target'), '#ff8fa3');
+      Snd.play('back');
+      Game.layoutScreen();
+      return;
+    }
+    var last = Store.data.duels.last;
+    if (last && !last.resolved && last.seed === seed) {
+      /* возврат вашего вызова: сравнение без переигрывания */
+      last.resolved = true;
+      var dr2 = (last.score === target) ? 0 : (last.score > target ? 1 : -1);
+      Store.data.duels.played++;
+      if (dr2 === 1) Store.data.duels.won++; else if (dr2 === -1) Store.data.duels.lost++;
+      var dh2 = Store.data.duels.history || (Store.data.duels.history = []);
+      dh2.unshift({ seed: seed, mine: last.score, theirs: target, res: dr2, ts: Date.now() });
+      if (dh2.length > 8) dh2.length = 8;
+      Store.flush();
+      Game.duelResult = { mine: last.score, theirs: target, res: dr2, seed: seed };
+      Snd.play(dr2 === 1 ? 'unlock' : (dr2 === 0 ? 'ui' : 'back'));
+      if (FS.Analytics) FS.Analytics.ev('duel_resolve', { res: dr2 });
+      Game.gotoScreen('duelresult');
+      return;
+    }
+    Game.duelTarget = target;
     Game.duelCode = seed;
     Game.startRound('duel', { seed: seed });
   };
-  /* B3 v6.3: «дуэль дня» — сид от ключа дня (Daily.today), один на всех.
-     Полностью переиспользует механику дуэлей (duelStart); новый режим НЕ
-     создаётся. Вызов другу уходит существующей кнопкой shareDuel на экране
-     итогов — текст duel_share автоматически несёт код дня (Game.duelCode). */
-  Game.duelDaily = function () {
-    var seed = Events.seedOf('duel-day-' + Daily.today()) % 1000000000;
-    Game.duelBuf = String(seed);
-    Store.data.duels.created++;
-    Store.save();
-    Game.duelStart();
-    Game.toast(I18N.t('duel'), I18N.t('duel_code', { code: seed }), '#ffd75a');
-    Game.logMsg('duel-daily:' + seed);
-  };
+  /* v6.5: «дуэль дня» удалена — дуэль без соперника невозможна. */
   Game.shareDuel = function () {
     var code = Game.duelCode || Game.roundSeed;
     var text = I18N.t('duel_share', { code: code + ':' + Game.score, score: Game.score });
@@ -5163,15 +5279,72 @@ if (!window.vkBridge) {
   };
   /* ===================== v6.4 PATCH: НОВЫЕ ДЕЙСТВИЯ ====================== */
 
+  /* ===== v6.5: копирование кода дуэли (VKWebAppCopyText + фолбэк) ===== */
+  Game.copyDuelText = function (code) {
+    function done(ok) {
+      Game.toast(ok ? I18N.t('duel_copied') : code, '', ok ? '#8dffbe' : '#ffd84d');
+      if (ok) Snd.play('ui');
+    }
+    try {
+      var pl = Game.platform;
+      if (pl && pl.bridge && pl.bridge.send) {
+        Promise.resolve(pl.bridge.send('VKWebAppCopyText', { text: String(code) }))
+          .then(function () { done(true); }, function () { done(Game.copyFallback(code)); });
+        return;
+      }
+    } catch (e) { }
+    done(Game.copyFallback(code));
+  };
+  Game.copyFallback = function (text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(String(text)); return true; }
+      var ta = document.createElement('textarea');
+      ta.value = String(text);
+      (document.body || document.documentElement).appendChild(ta);
+      ta.select();
+      var ok = !!(document.execCommand && document.execCommand('copy'));
+      ta.parentNode.removeChild(ta);
+      return ok;
+    } catch (e) { return false; }
+  };
+  Game.copyDuelCode = function () {
+    Game.copyDuelText((Game.duelCode || Game.roundSeed) + ':' + Game.score);
+  };
+  Game.copyLastCode = function () {
+    var l = Store.data.duels.last;
+    if (!l) { Snd.play('back'); return; }
+    Game.copyDuelText(l.seed + ':' + l.score);
+  };
+  Game.shareDuelResult = function () {
+    var dr = Game.duelResult || {};
+    var resn = (dr.res === 1) ? I18N.t('duel_win') : (dr.res === 0 ? I18N.t('duel_draw') : I18N.t('duel_lose'));
+    var text = I18N.t('duel_res_share', { seed: dr.seed, mine: dr.mine, theirs: dr.theirs, res: resn });
+    var pl = Game.platform;
+    var link = (pl && pl.appLink) ? pl.appLink('') : null;
+    if (link) text += '\n' + I18N.t('share_link_line', { link: link });
+    if (FS.Analytics) FS.Analytics.ev('share', { type: 'duel_result' });
+    Game.shareWithText(text);
+  };
+
   /* Deep-link дуэли: запустить раунд по коду из ссылки друга */
   Game.consumePendingDuel = function () {
     var pd = Game.pendingDuel;
     if (!pd || !Store.data.tutorial_done || !Game.consentOK) return;
     if (Game.screen === 'loading' || Game.screen === 'boot') return;
     Game.pendingDuel = null;
-    Game.duelBuf = pd.target ? (pd.seed + ':' + pd.target) : String(pd.seed);
-    Game.duelTarget = pd.target;
     Game.duelCode = pd.seed;
+    /* v6.5: ссылка без счёта соперника — не запускаем «дуэль в одиночку»,
+       а открываем экран дуэли с предзаполненным кодом и подсказкой */
+    if (pd.target === null || pd.target === undefined) {
+      Game.duelBuf = String(pd.seed) + ':';
+      Game.duelTarget = null;
+      Game.toast(I18N.t('duel'), I18N.t('duel_need_target'), '#ffd84d');
+      Game.gotoScreen('duel');
+      Game.logMsg('deep-link-duel-notarget:' + pd.seed);
+      return;
+    }
+    Game.duelBuf = pd.seed + ':' + pd.target;
+    Game.duelTarget = pd.target;
     Game.toast(I18N.t('duel'), I18N.t('duel_from_link'), '#ffd75a');
     Game.logMsg('deep-link-duel:' + pd.seed);
     if (FS.Analytics) FS.Analytics.ev('deep_link_duel', { seed: pd.seed });
@@ -6114,7 +6287,7 @@ if (!window.vkBridge) {
   Game.bgFor = function () {
     var s = Game.screen;
     if (s === 'shop' || s === 'ach' || s === 'settings' || s === 'quests' || s === 'dex' || s === 'event' || s === 'wheel') return 'bg_shop.png';
-    if (s === 'menu' || s === 'modes' || s === 'confirm' || s === 'duel') return 'bg_menu.png';
+    if (s === 'menu' || s === 'modes' || s === 'confirm' || s === 'duel' || s === 'duelresult') return 'bg_menu.png';
     return 'bg_game.png';
   };
 
@@ -6694,6 +6867,24 @@ if (!window.vkBridge) {
     ctx.strokeStyle = 'rgba(255,255,255,.18)';
     ctx.lineWidth = Math.max(1, u * 0.003);
     U.rr(ctx, mx, my, mw, mh, mh / 2); ctx.stroke();
+
+    /* ===== v6.5: в дуэли — цель (счёт соперника) и живой статус лидирования */
+    if (Game.mode === 'duel' && Game.duelTarget !== null && Game.duelTarget !== undefined) {
+      var tTxt = I18N.t('duel_target', { n: Game.duelTarget });
+      ctx.font = '900 ' + (u * 0.030) + 'px ' + U.FONT;
+      var tww = U.tw(ctx, tTxt, ctx.font) + u * 0.06;
+      var thh = u * 0.058;
+      var tx = mir ? (W - pad - tww) : pad, ty = my + mh + u * 0.018;
+      var lead = Game.score > Game.duelTarget;
+      ctx.fillStyle = 'rgba(10,6,24,.6)';
+      U.rr(ctx, tx, ty, tww, thh, thh * 0.3); ctx.fill();
+      ctx.strokeStyle = U.rgba(lead ? '#8dffbe' : '#ffd84d', 0.55);
+      ctx.lineWidth = Math.max(1, u * 0.003);
+      U.rr(ctx, tx, ty, tww, thh, thh * 0.3); ctx.stroke();
+      ctx.fillStyle = lead ? '#8dffbe' : '#ffd84d';
+      ctx.textAlign = 'center';
+      ctx.fillText(tTxt, tx + tww / 2, ty + thh * 0.55);
+    }
 
     if (Game.mode !== 'classic' && (Game.screen === 'playing' || Game.screen === 'paused')) {
       var tl = Math.max(0, Game.timeLeft);
@@ -7532,6 +7723,26 @@ if (!window.vkBridge) {
     } else if (s === 'confirm') {
       Game.drawDim(0.6);
       Game.drawPanelBox(Game.W / 2, Game.H * 0.36, (Game.confirm && Game.confirm.text) || '');
+    } else if (s === 'duelresult') {
+      /* v6.5: большой вердикт дуэли */
+      Game.drawDim(0.62);
+      var drw = Game.duelResult || {};
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      var resT = (drw.res === 1) ? I18N.t('duel_win') : (drw.res === 0 ? I18N.t('duel_draw') : I18N.t('duel_lose'));
+      var resC = (drw.res === 1) ? '#8dffbe' : (drw.res === 0 ? '#ffd84d' : '#ff8fa3');
+      ctx.font = '900 ' + (u * 0.10) + 'px ' + U.FONT;
+      ctx.lineJoin = 'round'; ctx.lineWidth = u * 0.014; ctx.strokeStyle = 'rgba(20,8,40,.8)';
+      ctx.strokeText(resT, W / 2, H * 0.28);
+      ctx.fillStyle = resC;
+      ctx.fillText(resT, W / 2, H * 0.28);
+      ctx.font = '900 ' + (u * 0.045) + 'px ' + U.FONT;
+      ctx.fillStyle = '#fff';
+      ctx.fillText(I18N.t('duel_you') + ' ' + drw.mine + '  :  ' + drw.theirs + ' ' + I18N.t('duel_rival'), W / 2, H * 0.38, W * 0.92);
+      ctx.font = '700 ' + (u * 0.028) + 'px ' + U.FONT;
+      ctx.fillStyle = 'rgba(255,255,255,.65)';
+      ctx.fillText(I18N.t('duel_code', { code: drw.seed }), W / 2, H * 0.44);
+      ctx.restore();
     } else if (s === 'tutorial') {
       Game.drawTutorial();
     }
@@ -7678,11 +7889,17 @@ if (!window.vkBridge) {
     ctx.fillText(title, pcx, py + ph * 0.10);
     if (Game.mode === 'duel' && Game.duelWin !== null && Game.duelWin !== undefined) {
       ctx.font = '900 ' + (u * 0.045) + 'px ' + U.FONT;
-      ctx.fillStyle = Game.duelWin ? '#8dffbe' : '#ff8fa3';
-      ctx.fillText(Game.duelWin ? I18N.t('duel_win') : I18N.t('duel_lose'), pcx, py + ph * 0.175);
+      ctx.fillStyle = (Game.duelWin === 'draw') ? '#ffd84d' : (Game.duelWin ? '#8dffbe' : '#ff8fa3');
+      ctx.fillText((Game.duelWin === 'draw') ? I18N.t('duel_draw') : (Game.duelWin ? I18N.t('duel_win') : I18N.t('duel_lose')), pcx, py + ph * 0.175);
       ctx.font = '700 ' + (u * 0.026) + 'px ' + U.FONT;
       ctx.fillStyle = 'rgba(255,255,255,.7)';
       ctx.fillText(I18N.t('duel_code', { code: Game.roundSeed }), pcx, py + ph * 0.225);
+    }
+    /* v6.5: раунд-вызов — показываем ваш личный код прямо в панели итогов */
+    if (Game.mode === 'duel' && (Game.duelWin === null || Game.duelWin === undefined)) {
+      ctx.font = '700 ' + (u * 0.028) + 'px ' + U.FONT;
+      ctx.fillStyle = '#ffd84d';
+      ctx.fillText(I18N.t('duel_my_code') + ': ' + Game.roundSeed + ':' + Game.score, pcx, py + ph * 0.175, pw * 0.95);
     }
     var shown = Math.round((go.score || 0) * U.easeOut(U.clamp((Game.goAnim || 0) * 1.2, 0, 1)));
     ctx.font = '900 ' + (u * 0.13) + 'px ' + U.FONT;
