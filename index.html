@@ -364,7 +364,7 @@ if (!window.vkBridge) {
       wheel_btn: 'Колесо',
       wheel_hint: 'Бесплатный спин — раз в день',
       wheel_free: 'БЕСПЛАТНЫЙ СПИН',
-      wheel_ad: '🎬 ЕЩЁ СПИН',
+      wheel_ad: 'ЕЩЁ СПИН',
       wheel_left: 'Спинов за рекламу сегодня: {n}',
       wheel_tomorrow: 'Возвращайся завтра за бесплатным спином!',
       wheel_win: '+{n} монет!',
@@ -372,12 +372,12 @@ if (!window.vkBridge) {
       invite_friend: 'Пригласить друга',
       invite_ok: 'Приглашение отправлено!',
       invite_fail: 'Не удалось отправить приглашение',
-      to_story: '📷 В историю',
-      fav_prompt: '★ В избранное — чтобы не потерять игру',
+      to_story: 'В историю',
+      fav_prompt: 'В избранное — не потерять игру',
       fav_ok: 'Игра добавлена в избранное!',
       time_ext_15: '+15 СЕКУНД',
-      daily_x2: '🎬 ×2',
-      quest_x2: '🎬 ×2',
+      daily_x2: '×2',
+      quest_x2: '×2',
       quest_x2_left: 'Удвоений наград сегодня: {n}',
       duel_from_link: 'Друг вызвал тебя на дуэль!',
       community: 'Сообщество игры',
@@ -448,7 +448,7 @@ if (!window.vkBridge) {
       wheel_btn: 'Wheel',
       wheel_hint: 'One free spin a day',
       wheel_free: 'FREE SPIN',
-      wheel_ad: '🎬 EXTRA SPIN',
+      wheel_ad: 'EXTRA SPIN',
       wheel_left: 'Ad spins left today: {n}',
       wheel_tomorrow: 'Come back tomorrow for a free spin!',
       wheel_win: '+{n} coins!',
@@ -456,12 +456,12 @@ if (!window.vkBridge) {
       invite_friend: 'Invite a friend',
       invite_ok: 'Invite sent!',
       invite_fail: 'Could not send invite',
-      to_story: '📷 To story',
-      fav_prompt: '★ Add to favorites',
+      to_story: 'To story',
+      fav_prompt: 'Add to favorites',
       fav_ok: 'Added to favorites!',
       time_ext_15: '+15 SECONDS',
-      daily_x2: '🎬 ×2',
-      quest_x2: '🎬 ×2',
+      daily_x2: '×2',
+      quest_x2: '×2',
       quest_x2_left: 'Reward doubles left today: {n}',
       duel_from_link: 'A friend challenged you!',
       community: 'Game community',
@@ -1370,18 +1370,67 @@ if (!window.vkBridge) {
   };
 
   /* ------------------------------- сейвы ------------------------------ */
+  /* ===== v6.5.2 (п. 2.3.8 Правил): надёжная синхронизация прогресса =====
+     VK Storage ограничивает значение ключа (~4096 символов), а сейв с
+     реплеем рекордного раунда превышал лимит — запись МОЛЧА падала, и
+     прогресс не переносился между устройствами/платформами. Теперь:
+       • основной сейв пишется в fs_save_v1 БЕЗ тяжёлого replay;
+       • replay режется на чанки ≤ 3800 символов в ключи fs_save_v1_r0..r3
+         (при переполнении pts укорачиваются — прогресс важнее реплея);
+       • чтение собирает чанки обратно; битые чанки просто отключают реплей. */
   VkAdapter.prototype.save = function (data) {
     var self = this;
-    return this._send('VKWebAppStorageSet', { key: 'fs_save_v1', value: JSON.stringify(data) })
-      .then(function () { self.log.push('storage.set'); return true; })
-      ['catch'](function () { return false; });
+    var CH = 3800;
+    var RKEYS = ['fs_save_v1_r0', 'fs_save_v1_r1', 'fs_save_v1_r2', 'fs_save_v1_r3'];
+    var replay = data.replay || null;
+    var payload = replay ? Object.assign({}, data, { replay: null }) : data;
+    var json = JSON.stringify(payload);
+    if (json.length > CH) {
+      payload = Object.assign({}, payload, { fruit_stats: {} });
+      json = JSON.stringify(payload);
+    }
+    var rj = '';
+    if (replay) {
+      rj = JSON.stringify(replay);
+      if (rj.length > CH * RKEYS.length) {
+        var pts = replay.pts || [];
+        var keep = Math.floor(pts.length * (CH * RKEYS.length * 0.9) / rj.length);
+        replay = Object.assign({}, replay, { pts: pts.slice(0, Math.max(0, keep)) });
+        rj = JSON.stringify(replay);
+        if (rj.length > CH * RKEYS.length) rj = '';
+      }
+    }
+    var sets = [{ key: 'fs_save_v1', value: json }];
+    for (var i = 0; i < RKEYS.length; i++) {
+      sets.push({ key: RKEYS[i], value: rj ? rj.slice(i * CH, (i + 1) * CH) : '' });
+    }
+    var ps = [];
+    for (var k = 0; k < sets.length; k++) {
+      ps.push(this._send('VKWebAppStorageSet', sets[k])['catch'](function () { return false; }));
+    }
+    return Promise.all(ps).then(function (rs) {
+      var ok = rs[0] !== false;
+      self.log.push('storage.set:' + (ok ? 'ok' : 'fail') + ':' + json.length + 'B');
+      return ok;
+    });
   };
   VkAdapter.prototype.load = function () {
-    return this._send('VKWebAppStorageGet', { keys: ['fs_save_v1'] })
+    var keys = ['fs_save_v1', 'fs_save_v1_r0', 'fs_save_v1_r1', 'fs_save_v1_r2', 'fs_save_v1_r3'];
+    return this._send('VKWebAppStorageGet', { keys: keys })
       .then(function (r) {
-        var arr = r && r.keys;
-        if (!arr || !arr.length || !arr[0].value) return null;
-        try { return JSON.parse(arr[0].value); } catch (e) { return null; }
+        var arr = (r && r.keys) || [];
+        var map = {};
+        for (var i = 0; i < arr.length; i++) if (arr[i]) map[arr[i].key] = arr[i].value || '';
+        var mainV = map['fs_save_v1'];
+        if (!mainV) return null;
+        var out;
+        try { out = JSON.parse(mainV); } catch (e) { return null; }
+        var rj = (map['fs_save_v1_r0'] || '') + (map['fs_save_v1_r1'] || '') +
+                 (map['fs_save_v1_r2'] || '') + (map['fs_save_v1_r3'] || '');
+        if (rj && out && out.replay === null) {
+          try { out.replay = JSON.parse(rj); } catch (e) { }
+        }
+        return out;
       })
       ['catch'](function () { return null; });
   };
@@ -1395,6 +1444,11 @@ if (!window.vkBridge) {
   /* hard delete всех данных пользователя (требование VK-модерации) */
   VkAdapter.prototype.resetAll = function () {
     var self = this;
+    /* v6.5.2: чистим и чанки реплея */
+    var rk = ['fs_save_v1_r0', 'fs_save_v1_r1', 'fs_save_v1_r2', 'fs_save_v1_r3'];
+    for (var ri = 0; ri < rk.length; ri++) {
+      this._send('VKWebAppStorageSet', { key: rk[ri], value: '' })['catch'](function () { });
+    }
     return this._send('VKWebAppStorageSet', { key: 'fs_save_v1', value: '' })
       ['catch'](function () { })
       .then(function () {
@@ -1512,7 +1566,7 @@ if (!window.vkBridge) {
   /* ===================== ЧАСТЬ A: КОНФИГ, УТИЛИТЫ, АССЕТЫ, ЗВУК ======== */
 
   var CFG = {
-    version: '6.5.1',
+    version: '6.5.2',
     saveKey: 'fs_save_v1',
     schema: 3,
     /* Зазор между липким баннером и элементами интерфейса, px (п. 5.1.4.2г) */
@@ -2155,8 +2209,10 @@ if (!window.vkBridge) {
       if (Array.isArray(dst[k])) {
         if (Array.isArray(sv)) dst[k] = sv.slice();
       } else if (typeof dst[k] === 'object') {
-        mergeDef(dst[k], sv);
-      } else if (typeof dst[k] === typeof sv) {
+        /* v6.5.2: поле могло быть null (replay) — берём объект из сейва целиком */
+        if (dst[k] === null) dst[k] = src[k];
+        else mergeDef(dst[k], src[k]);
+      } else if (typeof dst[k] === typeof src[k]) {
         dst[k] = sv;
       }
     }
@@ -2713,12 +2769,14 @@ if (!window.vkBridge) {
       Game.wheelAnim = null;
       var segm = WHEEL_SEG[a.idx];
       var w = Store.data.wheel;
+      /* v6.5.2: результат показывается НА экране колеса отдельной строкой —
+         тост над колесом исключён (замечание модерации о пересечениях) */
       if (segm.premium) {
         Blades.premiumDay();
-        Game.toast(I18N.t('wheel_title'), I18N.t('wheel_premium'), '#ffdf6b');
+        Game.wheelWin = { text: I18N.t('wheel_premium'), color: '#ffdf6b' };
       } else {
         Store.addCoins(segm.coins);
-        Game.toast(I18N.t('wheel_title'), I18N.t('wheel_win', { n: segm.coins }), '#ffdf6b');
+        Game.wheelWin = { text: I18N.t('wheel_win', { n: segm.coins }), color: '#ffdf6b' };
       }
       w.wins = (w.wins || 0) + 1;
       Store.flush();
@@ -4653,7 +4711,7 @@ if (!window.vkBridge) {
       add(B('restart', cx - pw / 2, py + ph * 1.25, pw, ph, I18N.t('retry'), function () { Game.restartFromPause(); }, 'ghost'));
       add(B('tomenu', cx - pw / 2, py + ph * 2.5, pw, ph, I18N.t('menu'), function () { Game.toMenu(true); }, 'ghost'));
       if (zenExtBtn) {
-        add(B('zen_ext', cx - pw / 2, py + ph * 3.62, pw, ph * 0.9, '🎬 ' + I18N.t('zen_ext'),
+        add(B('zen_ext', cx - pw / 2, py + ph * 3.62, pw, ph * 0.9, I18N.t('zen_ext'),
           function () { Game.rewardZenExt(); }, 'gold', { icon: 'ui_ad.png' }));
       }
       var sw = u * 0.11;
@@ -4725,12 +4783,12 @@ if (!window.vkBridge) {
         gy += gh * 1.18;
       }
       if (zenRow) {
-        add(B('zen_ext', gx, gy, gw, gh, '🎬 ' + I18N.t('zen_ext'), function () { Game.rewardZenExt(); }, 'gold', { icon: 'ui_ad.png' }));
+        add(B('zen_ext', gx, gy, gw, gh, I18N.t('zen_ext'), function () { Game.rewardZenExt(); }, 'gold', { icon: 'ui_ad.png' }));
         gy += gh * 1.18;
       }
       if (extRow) {
         /* v6.4: «+15 сек» за rewarded в Аркаде/Дейлике */
-        add(B('time_ext', gx, gy, gw, gh, '🎬 ' + I18N.t('time_ext_15'), function () { Game.rewardTimeExt(); }, 'gold', { icon: 'ui_ad.png' }));
+        add(B('time_ext', gx, gy, gw, gh, I18N.t('time_ext_15'), function () { Game.rewardTimeExt(); }, 'gold', { icon: 'ui_ad.png' }));
         gy += gh * 1.18;
       }
       var shW = gh;
@@ -4859,11 +4917,11 @@ if (!window.vkBridge) {
         { list: true, tag: b.id, blade: b, owned: owned, can: can, h0: trialAny ? h0 : chh }));
       if (trialAny && !owned && !b.event) {
         Game.buttons.push(B('trial_' + b.id, cxx + cw * 0.06, cyy + h0 + cw * 0.025, cw * 0.88, cw * 0.17,
-          '🎬 ' + I18N.t('trial_ad'),
+          I18N.t('trial_ad'),
           (function (blade) {
             return function () { Game.rewardBladeTrialFor(blade); };
           })(b),
-          'gold', { list: true, tag: b.id }));
+          'gold', { list: true, tag: b.id, icon: 'ui_ad.png' }));   /* v6.5.2: иконка вместо эмодзи */
       }
     }
     var rows = Math.ceil(list.length / cols);
@@ -4878,7 +4936,9 @@ if (!window.vkBridge) {
     var bw = Math.min(W - pad * 2, u * (L ? 0.52 : 0.82));
     var bx = (W - bw) / 2;
     var bh = u * 0.105;
-    var y = la.y + la.h - bh - u * 0.05;
+    /* v6.5.2: кнопка строго ПОД инфострокой колеса, не выше низа области */
+    var gm = Game.wheelGeom(la);
+    var y = Math.min(gm.btnY, la.y + la.h - bh - u * 0.02);
     var free = FS.Wheel.canFree();
     var adLeft = FS.Wheel.adLeft();
     if (Game.wheelAnim) {
@@ -4896,13 +4956,27 @@ if (!window.vkBridge) {
     Game.scrollMax = 0;
   };
 
+  /* ===== v6.5.2: единая геометрия колеса для раскладки и отрисовки.
+     Сверху резервируется полоса под тосты (u*0.20), снизу — место под
+     инфостроку И кнопку: пересечения элементов исключены конструктивно. ===== */
+  Game.wheelGeom = function (la) {
+    var u = Game.unit;
+    var R = Math.max(u * 0.11, Math.min(la.w * 0.32, (la.h - u * 0.80) * 0.5));
+    var cx = Game.W / 2;
+    /* сверху резерв u*0.22 под зону тостов — колесо начинается ниже неё */
+    var cy = la.y + u * 0.22 + R;
+    var infoY = cy + R + u * 0.050;   /* инфострока спинов */
+    var winY = infoY + u * 0.050;     /* строка результата спина */
+    var btnY = winY + u * 0.055;      /* кнопка спина — строго ниже */
+    return { cx: cx, cy: cy, R: R, infoY: infoY, winY: winY, btnY: btnY };
+  };
+
   Game.drawWheel = function () {
     var ctx = Game.ctx, u = Game.unit, L = Game.orient === 'landscape';
     var la = UI.listArea;
     if (!la) return;
-    var cx = Game.W / 2;
-    var R = Math.max(u * 0.12, Math.min(la.w * 0.34, (la.h - u * 0.30) * 0.5));
-    var cy = la.y + R + u * 0.06;
+    var gm = Game.wheelGeom(la);
+    var cx = gm.cx, cy = gm.cy, R = gm.R;
     var seg = FS.Wheel.seg, n = seg.length, segA = U.TAU / n;
     var ang = Game.wheelAngle || 0;
     var a = Game.wheelAnim;
@@ -4954,7 +5028,12 @@ if (!window.vkBridge) {
     ctx.fillStyle = 'rgba(255,255,255,.82)';
     var info = FS.Wheel.canFree() ? I18N.t('wheel_hint')
       : I18N.t('wheel_left', { n: FS.Wheel.adLeft() });
-    ctx.fillText(info, cx, cy + R + u * 0.075, Game.W * 0.92);
+    ctx.fillText(info, cx, gm.infoY, Game.W * 0.92);
+    if (Game.wheelWin) {
+      ctx.fillStyle = Game.wheelWin.color || '#ffdf6b';
+      ctx.font = '900 ' + (u * 0.034) + 'px ' + U.FONT;
+      ctx.fillText(Game.wheelWin.text, cx, gm.winY, Game.W * 0.92);
+    }
     ctx.restore();
   };
 
@@ -4989,8 +5068,8 @@ if (!window.vkBridge) {
         (q.claimed ? 'row_on' : (q.cur >= q.goal ? 'row_claim' : 'row')),
         { list: true, quest: q, idx: i }));
       if (x2Row) {
-        Game.buttons.push(B('quest2x_' + i, W - pad - x2w, y, x2w, rh, '🎬×2',
-          (function (idx) { return function () { Game.claimQuestX2(idx); }; })(i), 'gold', { list: true }));
+        Game.buttons.push(B('quest2x_' + i, W - pad - x2w, y, x2w, rh, I18N.t('quest_x2'),
+          (function (idx) { return function () { Game.claimQuestX2(idx); }; })(i), 'gold', { list: true, icon: 'ui_ad.png' }));
       }
     }
     /* v6.5: «дуэль дня» убрана с экрана заданий */
@@ -7044,6 +7123,13 @@ if (!window.vkBridge) {
     if (press !== 1) { ctx.translate(b.x + b.w / 2, y + b.h / 2); ctx.scale(press, press); ctx.translate(-(b.x + b.w / 2), -(y + b.h / 2)); }
     var st = b.style;
     var dis = (st === 'disabled' || !b.enabled);
+    /* ===== v6.5.2 (замечание модерации): единый стиль текста на кнопках —
+       все КНОПКИ ДЕЙСТВИЙ (primary/gold/danger/ghost/card) рисуются в верхнем
+       регистре; строки списков (row/cell) остаются в обычном регистре ===== */
+    if ((st === 'primary' || st === 'gold' || st === 'danger' || st === 'ghost' || st === 'card') && b.label) {
+      var upLab = String(b.label).toUpperCase();
+      if (upLab !== b.label) b.label = upLab;
+    }
     ctx.globalAlpha = dis ? 0.45 : 1;
 
     if (st === 'icon') {
@@ -8356,7 +8442,11 @@ if (!window.vkBridge) {
 
   Game.bindPlatform = function (pl) {
     if (!pl || !pl.on) return;
-    pl.on('pause', Game.onPlatformPause);
+    pl.on('pause', function () {
+    /* v6.5.2: VKWebAppViewHide — сразу пишем прогресс в облако (п. 2.3.8) */
+    try { Store.flush(); } catch (e) { }
+    Game.onPlatformPause();
+  });
     pl.on('resume', Game.onPlatformResume);
     pl.on('ads:start', function () { Game.setPaused(true, 'ad'); });
     pl.on('ads:close', function () { Game.setPaused(false, 'ad'); });
@@ -8512,6 +8602,16 @@ if (!window.vkBridge) {
     /* VK-модерация: согласие с условиями ДО меню/рекламы; баннер — только после согласия */
     Game.consentOK = !(Game.platform && Game.platform.name === 'vk') ||
       !!(Store.data.settings && Store.data.settings.accepted);
+    /* ===== v6.5.2 (п. 2.3.8): гарантированное сохранение при сворачивании/
+       закрытии — прогресс не теряется между платформами и сессиями ===== */
+    try {
+      var flushH = function () { try { Store.flush(); } catch (e) { } };
+      window.addEventListener('pagehide', flushH);
+      window.addEventListener('beforeunload', flushH);
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') flushH();
+      });
+    } catch (e) { }
     Game.initMenuFruits();
     if (Game.bootFailed()) {
       /* п. 3.5.1/2.2.2: не «бесконечная загрузка» и не пустой экран,
