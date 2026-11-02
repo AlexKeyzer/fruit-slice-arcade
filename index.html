@@ -1566,7 +1566,7 @@ if (!window.vkBridge) {
   /* ===================== ЧАСТЬ A: КОНФИГ, УТИЛИТЫ, АССЕТЫ, ЗВУК ======== */
 
   var CFG = {
-    version: '6.5.2',
+    version: '6.5.3',
     saveKey: 'fs_save_v1',
     schema: 3,
     /* Зазор между липким баннером и элементами интерфейса, px (п. 5.1.4.2г) */
@@ -4933,12 +4933,11 @@ if (!window.vkBridge) {
   Game.layoutWheel = function (la) {
     var W = Game.W, u = Game.unit, L = Game.orient === 'landscape';
     var pad = u * 0.03;
-    var bw = Math.min(W - pad * 2, u * (L ? 0.52 : 0.82));
-    var bx = (W - bw) / 2;
-    var bh = u * 0.105;
-    /* v6.5.2: кнопка строго ПОД инфострокой колеса, не выше низа области */
     var gm = Game.wheelGeom(la);
-    var y = Math.min(gm.btnY, la.y + la.h - bh - u * 0.02);
+    var bw = gm.land ? gm.colW : Math.min(W - pad * 2, u * 0.82);
+    var bx = gm.land ? gm.colX : (W - bw) / 2;
+    var bh = gm.bh;
+    var y = gm.btnY;
     var free = FS.Wheel.canFree();
     var adLeft = FS.Wheel.adLeft();
     if (Game.wheelAnim) {
@@ -4960,15 +4959,35 @@ if (!window.vkBridge) {
      Сверху резервируется полоса под тосты (u*0.20), снизу — место под
      инфостроку И кнопку: пересечения элементов исключены конструктивно. ===== */
   Game.wheelGeom = function (la) {
+    /* ===== v6.5.3: раскладка без пересечений в любых условиях =====
+       Портрет: вертикальный стек снизу вверх — кнопка у низа области,
+       над ней строки результата и спинов, колесо вписывается в остаток
+       между зоной тостов и инфострокой.
+       Альбом: колесо СЛЕВА, строки и кнопка — в правой колонке, поэтому
+       нехватка высоты (низкие экраны, зарезервированная зона баннера)
+       больше не может сжать элементы друг в друга. */
     var u = Game.unit;
-    var R = Math.max(u * 0.11, Math.min(la.w * 0.32, (la.h - u * 0.80) * 0.5));
-    var cx = Game.W / 2;
-    /* сверху резерв u*0.22 под зону тостов — колесо начинается ниже неё */
-    var cy = la.y + u * 0.22 + R;
-    var infoY = cy + R + u * 0.050;   /* инфострока спинов */
-    var winY = infoY + u * 0.050;     /* строка результата спина */
-    var btnY = winY + u * 0.055;      /* кнопка спина — строго ниже */
-    return { cx: cx, cy: cy, R: R, infoY: infoY, winY: winY, btnY: btnY };
+    var bh = u * 0.105;
+    var topY = la.y + u * 0.22;   /* резерв под тосты */
+    var L = (Game.orient === 'landscape') && la.w > la.h * 1.15;
+    if (L) {
+      var R = Math.max(u * 0.09, Math.min(la.w * 0.21, (la.h - u * 0.26) * 0.5));
+      var cx = la.w * 0.28;
+      var cy = topY + R;
+      var colX = la.w * 0.54, colW = la.w * 0.42;
+      var btnY = la.y + la.h - bh - u * 0.02;
+      var winY = btnY - u * 0.058;
+      var infoY = la.y + Math.max(u * 0.30, la.h * 0.30);
+      if (infoY > winY - u * 0.04) infoY = winY - u * 0.04;
+      return { cx: cx, cy: cy, R: R, infoY: infoY, winY: winY, btnY: btnY,
+               colX: colX, colW: colW, land: true, bh: bh };
+    }
+    var btnYp = la.y + la.h - bh - u * 0.02;
+    var winYp = btnYp - u * 0.058;
+    var infoYp = winYp - u * 0.048;
+    var Rp = Math.max(u * 0.09, Math.min(la.w * 0.32, (infoYp - u * 0.045 - topY) / 2));
+    return { cx: Game.W / 2, cy: topY + Rp, R: Rp, infoY: infoYp, winY: winYp,
+             btnY: btnYp, colX: null, colW: 0, land: false, bh: bh };
   };
 
   Game.drawWheel = function () {
@@ -5028,11 +5047,14 @@ if (!window.vkBridge) {
     ctx.fillStyle = 'rgba(255,255,255,.82)';
     var info = FS.Wheel.canFree() ? I18N.t('wheel_hint')
       : I18N.t('wheel_left', { n: FS.Wheel.adLeft() });
-    ctx.fillText(info, cx, gm.infoY, Game.W * 0.92);
+    /* v6.5.3: в альбоме тексты живут в правой колонке, не над колесом */
+    var tx = gm.land ? gm.colX + gm.colW / 2 : cx;
+    var twd = gm.land ? gm.colW : Game.W * 0.92;
+    ctx.fillText(info, tx, gm.infoY, twd);
     if (Game.wheelWin) {
       ctx.fillStyle = Game.wheelWin.color || '#ffdf6b';
       ctx.font = '900 ' + (u * 0.034) + 'px ' + U.FONT;
-      ctx.fillText(Game.wheelWin.text, cx, gm.winY, Game.W * 0.92);
+      ctx.fillText(Game.wheelWin.text, tx, gm.winY, twd);
     }
     ctx.restore();
   };
@@ -8657,7 +8679,7 @@ if (!window.vkBridge) {
     var pl = Game.platform;
     if (!pl || pl.name !== 'vk' || !pl.showBanner || !pl.hideBanner) return;
     if (!Game._bannerRequested || !Game.consentOK || !Store.data.tutorial_done) return;
-    var hiddenScreens = { playing: 1, paused: 1, tutorial: 1, replay: 1, confirm: 1, loading: 1, boot: 1 };
+    var hiddenScreens = { playing: 1, paused: 1, tutorial: 1, replay: 1, confirm: 1, loading: 1, boot: 1, wheel: 1 };
     var want = !hiddenScreens[Game.screen];
     if (want === Game._bannerOn) return;
     Game._bannerOn = want;
@@ -8669,7 +8691,7 @@ if (!window.vkBridge) {
     if (Game._bannerRequested) return;
     /* v6.4: баннер показывается не только в меню, но и на неигровых экранах
        (онбординг и геймплей — по-прежнему без баннера: п. 5.1.4.2а Правил) */
-    var okScreens = { menu: 1, shop: 1, ach: 1, quests: 1, rating: 1, event: 1, dex: 1, wheel: 1 };
+    var okScreens = { menu: 1, shop: 1, ach: 1, quests: 1, rating: 1, event: 1, dex: 1 };
     if (!Game.consentOK || !okScreens[Game.screen]) return;
     if (!Store.data.tutorial_done) return;
     var pl = Game.platform;
