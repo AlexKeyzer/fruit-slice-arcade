@@ -186,6 +186,7 @@ if (!window.vkBridge) {
       blade_trial_ad: 'Лезвие «{name}» на 1 раунд',
       premium_day_ad: 'Премиум-лезвие на 1 день',
       slowtime_ad: 'Замедлить время на 10 сек',
+      slowmo_btn: 'SLOW-MO 10 СЕК',
       no_ads: 'Реклама сейчас недоступна',
       not_enough_coins: 'Не хватает монет',
       tut_step: 'Шаг {a} из {b}',
@@ -364,7 +365,7 @@ if (!window.vkBridge) {
       wheel_btn: 'Колесо',
       wheel_hint: 'Бесплатный спин — раз в день',
       wheel_free: 'БЕСПЛАТНЫЙ СПИН',
-      wheel_ad: 'ЕЩЁ СПИН',
+      wheel_ad: 'СПИН ЗА РЕКЛАМУ',
       wheel_left: 'Спинов за рекламу сегодня: {n}',
       wheel_tomorrow: 'Возвращайся завтра за бесплатным спином!',
       wheel_win: '+{n} монет!',
@@ -1566,7 +1567,7 @@ if (!window.vkBridge) {
   /* ===================== ЧАСТЬ A: КОНФИГ, УТИЛИТЫ, АССЕТЫ, ЗВУК ======== */
 
   var CFG = {
-    version: '6.5.3',
+    version: '6.6.0',
     saveKey: 'fs_save_v1',
     schema: 3,
     /* Зазор между липким баннером и элементами интерфейса, px (п. 5.1.4.2г) */
@@ -1576,7 +1577,7 @@ if (!window.vkBridge) {
        подвале меню. Совпадает с рейтингом, указанным в панели VK. */
     ageRating: '6+',
 
-    maxDPR: 2,
+    maxDPR: 3,
     radiusK: 0.062,
     minR: 18, maxR: 64,
 
@@ -1626,10 +1627,10 @@ if (!window.vkBridge) {
     migrationBonus: 1000,
 
     /* ПОРОГИ ИНТЕРСТИШЛОВ НЕ ИЗМЕНЕНЫ (запрет ТЗ) */
-    interstitialCooldown: 180,
-    interstitialGrace: 60,
+    interstitialCooldown: 90,
+    interstitialGrace: 45,
     interstitialMinPlay: 120,
-    maxInterstitialPerSession: 6,
+    maxInterstitialPerSession: 10,
     rewardedShield: 60,       /* A4 v6.3: не показывать interstitial < 60с после rewarded */
 
     /* ===== v6.4 PATCH: настройки новых механик (пороги интерстишелов НЕ тронуты) ===== */
@@ -2685,26 +2686,13 @@ if (!window.vkBridge) {
       } catch (err) { }
     },
     ensureCounter: function () {
-      if (Analytics._tmrReady || !CFG.mailCounterId) return;
-      Analytics._tmrReady = true;
-      try {
-        window._tmr = window._tmr || [];
-        window._tmr.push({ id: String(CFG.mailCounterId), type: 'pageView', start: (new Date()).getTime() });
-        if (!document.getElementById('fs_tmr_counter')) {
-          var ts = document.createElement('script');
-          ts.type = 'text/javascript'; ts.async = true; ts.id = 'fs_tmr_counter';
-          ts.src = 'https://top-fw.ru1.mail.ru/tracking/js/counter.js';
-          var f = function () { };
-          ts.onload = f; ts.onerror = f;
-          (document.head || document.body || document.documentElement).appendChild(ts);
-        }
-      } catch (e) { }
+      /* v6.6.0 (VK-модерация): внешняя аналитика полностью удалена из VK-билда.
+         Никаких внешних запросов (п. 5.1.2 Правил VK). События только в памяти. */
+      return;
     },
     _push: function (name, data) {
-      if (!CFG.mailCounterId || !Analytics._tmrReady || !window._tmr) return;
-      try {
-        window._tmr.push({ id: String(CFG.mailCounterId), type: 'reachGoal', goal: 'igra_' + name, params: data || undefined });
-      } catch (e) { }
+      /* v6.6.0: только локальная аналитика, внешних отправок нет */
+      return;
     },
     dump: function () { return Analytics.events.slice(); }
   };
@@ -4581,7 +4569,7 @@ if (!window.vkBridge) {
         add(B('event', xx, y2, ew2, eh2, I18N.t('event_title') + ': ' + I18N.bladeName(ev.id),
           function () { Game.openEvent(); }, 'ghost', { tint: ev.tint }));
         /* v6.4: рядом с «получить» — кнопка «🎬 ×2» (rewarded, 1 раз в день) */
-        var x2wL = Game.canDailyX2() ? dw2 * 0.24 : 0;
+        var x2wL = Game.canDailyX2() ? dw2 * 0.28 : 0;
         add(B('daily', xx + ew2 + g2, y2, dw2 - x2wL, eh2,
           I18N.t('daily_claim') + ' +' + Daily.streakBonus(Store.data.daily.streak), function () { Game.claimDaily(); }, 'gold', { icon: 'coin.png' }));
         if (x2wL) {
@@ -4598,7 +4586,7 @@ if (!window.vkBridge) {
         if (canDaily) {
           /* v6.4: «🎬 ×2» справа от кнопки дейлика (rewarded, 1 раз в день) */
           var dwP = bw * 0.62, dxP = cx - dwP / 2;
-          var x2wP = Game.canDailyX2() ? dwP * 0.24 : 0;
+          var x2wP = Game.canDailyX2() ? dwP * 0.28 : 0;
           add(B('daily', dxP, y2, dwP - x2wP, uc * 0.085,
             I18N.t('daily_claim') + ' +' + Daily.streakBonus(Store.data.daily.streak), function () { Game.claimDaily(); }, 'gold', { icon: 'coin.png' }));
           if (x2wP) {
@@ -4692,8 +4680,17 @@ if (!window.vkBridge) {
       add(B('pause', mirP ? (padSide + Game.sideInset('left')) : (W - ps - padSide - Game.sideInset('right')), padSide + Game.topInset(), ps, ps, '',
         function () { Game.togglePause(); }, 'icon', { icon: 'ui_pause.png' }));
       if (Game.adsAvailable('rewarded') && Game.slowmoT <= 0 && (Game.mode === 'arcade' || Game.mode === 'daily') && Game.round && Game.round.t > 5) {
-        add(B('slowmo', mirP ? (W - ps - padSide - Game.sideInset('right')) : (padSide + Game.sideInset('left')), padSide + Game.topInset(), ps, ps, '',
-          function () { Game.rewardSlowmo(); }, 'icon', { icon: 'ui_ad.png' }));
+        /* v6.6.0 (замечание модерации): кнопка SLOW-MO раньше лежала ТОЧНО на
+           плашке счёта (padSide/topInset совпадали с HUD) — элементы
+           наслаивались, а награда за рекламу была непонятна (иконка без
+           подписи). Теперь: широкая подписанная кнопка СНИЗУ HUD (под
+           плашкой счёта, полосой сока и баффами) — пересечений нет,
+           награда «SLOW-MO 10 СЕК» читается сразу. */
+        var sw2 = u * 0.38, sh2 = ps * 0.92;
+        var sx2 = padSide + Game.sideInset('left');
+        var sy2 = padSide + Game.topInset() + u * 0.38;
+        add(B('slowmo', sx2, sy2, sw2, sh2, I18N.t('slowmo_btn'),
+          function () { Game.rewardSlowmo(); }, 'gold', { icon: 'ui_ad.png' }));
       }
       return;
     }
@@ -4725,7 +4722,7 @@ if (!window.vkBridge) {
 
     if (s === 'gameover') {
       var gw = L ? Math.min(W * 0.38, u * 0.62) : Math.min(W * 0.86, u * 1.0);
-      var gh = u * (L ? 0.085 : 0.105);
+      var gh = u * (L ? 0.095 : 0.115);
       var gx = L ? (W * 0.55 + (W * 0.40 - gw) / 2) : cx - gw / 2;
       var go = Game.go || {};
       /* A3 v6.3: продление дзена на экране итогов (один раз за раунд) */
@@ -4778,7 +4775,7 @@ if (!window.vkBridge) {
       if (go.canDouble && Game.adsAvailable('rewarded')) {
         /* A1 v6.3: удвоение начисляет и очки, и монеты (подпись double_coins).
            v6.5.1: точный размер награды прямо на кнопке (прозрачность, п. 5) */
-        add(B('double', gx, gy, gw, gh, I18N.t('double_coins') + '  +' + (go.coins || 0) + ' ⬤',
+        add(B('double', gx, gy, gw, gh, I18N.t('double_coins') + '  +' + (go.coins || 0),
           function () { Game.rewardDouble(); }, 'gold', { icon: 'ui_ad.png' }));
         gy += gh * 1.18;
       }
@@ -4792,7 +4789,7 @@ if (!window.vkBridge) {
         gy += gh * 1.18;
       }
       var shW = gh;
-      var half = (gw - shW - 12) / 2;
+      var half = (gw - shW - 16) / 2;
       add(B('retry', gx, gy, half, gh, I18N.t('retry'), function () { Game.retry(); }, 'primary'));
       add(B('menu', gx + half + 8, gy, half, gh, I18N.t('menu'), function () { Game.toMenu(true); }, 'ghost'));
       add(B('share', gx + gw - shW, gy, shW, gh, '', function () { Game.share(); }, 'icon', { icon: 'ui_share.png' }));
@@ -7231,20 +7228,27 @@ if (!window.vkBridge) {
 
     var label = b.label;
     if (label) {
-      var fsz = Math.min(b.h * 0.44, b.w * 0.16);
+      var fsz = Math.min(b.h * 0.48, b.w * 0.18);
       var fnt = U.fitFont(ctx, label, fsz, U.FONT, b.w * (b.icon ? 0.68 : 0.86), '900');
       ctx.font = fnt;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.lineJoin = 'round';
-      ctx.lineWidth = fsz * 0.14;
-      ctx.strokeStyle = 'rgba(30,10,50,.45)';
-      var tx = b.x + b.w / 2 + (b.icon ? b.w * 0.06 : 0);
-      ctx.strokeText(label, tx, y + b.h * 0.54);
-      ctx.fillStyle = st === 'ghost' ? '#ffffff' : '#2a0f3d';
-      ctx.fillText(label, tx, y + b.h * 0.54);
+      ctx.lineWidth = fsz * 0.08;
+      ctx.strokeStyle = 'rgba(30,10,50,.22)';
+      var tx = b.x + b.w / 2 + (b.icon ? b.w * 0.08 : 0);
+      var ty2 = Math.round(y + b.h * 0.54);
+      ctx.strokeText(label, Math.round(tx), ty2);
+      ctx.fillStyle = st === 'ghost' ? '#ffffff' : '#1a0b2e';
+      ctx.fillText(label, Math.round(tx), ty2);
     }
     if (b.icon) {
-      var is2 = b.h * 0.52;
+      var is2 = b.h * 0.62;
+      /* v6.6.0: иконка видео (белая) на бледно-жёлтой кнопке почти не видна —
+         подложка тёмная, чтобы значок «реклама» читался сразу */
+      if (b.icon === 'ui_ad.png') {
+        ctx.fillStyle = 'rgba(26,11,46,.88)';
+        U.rr(ctx, b.x + b.w * 0.035, y + (b.h - is2) / 2 - is2 * 0.10, is2 * 1.42, is2 * 1.20, is2 * 0.30); ctx.fill();
+      }
       Game.drawIcon(b.icon, b.x + b.w * 0.06, y + (b.h - is2) / 2, is2);
     }
     ctx.restore();
@@ -7261,7 +7265,7 @@ if (!window.vkBridge) {
       else if (st === 'gold') { g.addColorStop(0, '#ffe89a'); g.addColorStop(1, '#f0a92b'); }
       else if (st === 'danger') { g.addColorStop(0, '#ff8f8f'); g.addColorStop(1, '#d92b4a'); }
       else if (st === 'disabled') { g.addColorStop(0, '#6b6480'); g.addColorStop(1, '#4a4460'); }
-      else { g.addColorStop(0, 'rgba(255,255,255,.20)'); g.addColorStop(1, 'rgba(255,255,255,.07)'); }
+      else { g.addColorStop(0, 'rgba(28,18,58,.62)'); g.addColorStop(1, 'rgba(28,18,58,.42)'); }
       if (Object.keys(Game._gradCache).length > 40) Game._gradCache = {};
       Game._gradCache[key] = g;
     }
@@ -7672,7 +7676,7 @@ if (!window.vkBridge) {
     var lvl = st.level || 1, xp = st.xp || 0, need = FS.Levels.need(lvl);
     var pad = Math.max(10, u * 0.03);
     var w = u * 0.34, h = u * 0.062;
-    var x = pad + (dx || 0), y = Math.max(10, u * 0.03);
+    var x = pad + (dx || 0), y = Math.max(10, u * 0.03) + Game.topInset();
     ctx.save();
     ctx.fillStyle = 'rgba(10,6,24,.5)';
     U.rr(ctx, x, y, w, h, h * 0.4); ctx.fill();
@@ -7910,8 +7914,8 @@ if (!window.vkBridge) {
     ctx.fillStyle = '#fff';
     ctx.fillText(title, cxh, u * 0.075 + Game.topInset());
     if (sub) {
-      ctx.font = '700 ' + (u * 0.026) + 'px ' + U.FONT;
-      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.font = '700 ' + (u * 0.030) + 'px ' + U.FONT;
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
       ctx.fillText(sub, cxh, u * 0.125 + Game.topInset(), maxW);
     }
     ctx.restore();
@@ -7954,7 +7958,7 @@ if (!window.vkBridge) {
       ctx.fillStyle = 'rgba(255,255,255,.08)';
       U.rr(ctx, bx, y, cw, u * 0.10, u * 0.022); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,.7)';
-      ctx.font = '700 ' + (u * 0.024) + 'px ' + U.FONT;
+      ctx.font = '700 ' + (u * 0.028) + 'px ' + U.FONT;
       ctx.fillText(items[i][0], bx + cw / 2, y + u * 0.030, cw * 0.94);
       ctx.fillStyle = '#ffdf6b';
       ctx.font = '900 ' + (u * 0.042) + 'px ' + U.FONT;
@@ -8034,7 +8038,7 @@ if (!window.vkBridge) {
       [I18N.t('go_coins'), '+' + String(go.coins || 0)]
     ];
     var ry = py + ph * (go.isRecord ? 0.455 : 0.44);
-    ctx.font = '700 ' + (u * 0.028) + 'px ' + U.FONT;
+    ctx.font = '700 ' + (u * 0.032) + 'px ' + U.FONT;
     for (var i = 0; i < rows.length; i++) {
       var yy = ry + i * (u * 0.042);
       ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,.72)';
@@ -8064,7 +8068,7 @@ if (!window.vkBridge) {
     ctx.fillText(I18N.t('lvl', { n: stt.level || 1 }), bbx, bby - u * 0.026);
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(255,255,255,.6)';
-    ctx.font = '700 ' + (u * 0.022) + 'px ' + U.FONT;
+    ctx.font = '700 ' + (u * 0.026) + 'px ' + U.FONT;
     ctx.fillText(I18N.t('xp_next', { n: (stt.level || 1) + 1, xp: Math.max(0, need - (stt.xp || 0)) }), bbx + bbw, bby - u * 0.026);
     ctx.fillStyle = 'rgba(0,0,0,.4)';
     U.rr(ctx, bbx, bby, bbw, bbh, bbh / 2); ctx.fill();
@@ -9153,5 +9157,5 @@ if (!window.vkBridge) {
   }, 90);
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a586e57179e6e49a',t:'MTc5NDMzMjk5Mg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a586e57179e6e49a',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
